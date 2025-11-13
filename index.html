@@ -26,7 +26,7 @@
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 75%;
       margin: 0 auto;
       padding: 0 20px;
     }
@@ -753,6 +753,61 @@
         margin-bottom: 5px;
         border-radius: 8px;
       }
+
+      /* Mobile Messages Modal */
+      #messages-modal .modal-content {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+      }
+
+      #conversations-list {
+        width: 100% !important;
+        border-right: none !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        height: 100% !important;
+        z-index: 5 !important;
+        transition: transform 0.3s ease !important;
+      }
+
+      #conversations-list.mobile-hidden {
+        transform: translateX(-100%) !important;
+      }
+
+      #chat-area {
+        width: 100% !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        height: 100% !important;
+        transform: translateX(100%) !important;
+        transition: transform 0.3s ease !important;
+      }
+
+      #chat-area.mobile-visible {
+        transform: translateX(0) !important;
+      }
+
+      #mobile-back-btn {
+        display: block !important;
+      }
+
+      #chat-header {
+        padding-left: 60px !important;
+      }
+
+      #message-input-area {
+        padding: 10px 15px !important;
+      }
+
+      #message-input {
+        font-size: 16px !important;
+        padding: 10px 14px !important;
+      }
     }
   </style>
   <style>@view-transition { navigation: auto; }</style>
@@ -997,6 +1052,8 @@
       <p style="font-size: 14px; color: #654321; margin-top: 5px;">Upload up to 10 images (max 32 MB each)</p>
       <div id="image-preview" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 15px;"></div>
      </div>
+     <div style="margin-bottom: 20px;"><label for="property-name" style="display: block; margin-bottom: 8px; font-weight: 600; color: #8B4513;">Property Name</label> <input type="text" id="property-name" required placeholder="e.g., Sunshine Apartments, Cozy Studio, etc." style="width: 100%; padding: 12px; border: 2px solid #ADD8E6; border-radius: 8px; font-size: 16px; color: #8B4513;">
+     </div>
      <div style="margin-bottom: 20px;"><label for="property-type" style="display: block; margin-bottom: 8px; font-weight: 600; color: #8B4513;">Type of Rental</label> <select id="property-type" required style="width: 100%; padding: 12px; border: 2px solid #ADD8E6; border-radius: 8px; font-size: 16px; color: #8B4513;"> <option value="">Select type</option> <option value="Single Family">Single Family</option> <option value="Single Room">Single Room</option> <option value="Boarding House">Boarding House</option> <option value="Studio Type">Studio Type</option> <option value="Bed Spacer">Bed Spacer</option> </select>
      </div>
      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
@@ -1235,20 +1292,20 @@
    </div>
   </div><!-- Messages Modal -->
   <div id="messages-modal" class="modal">
-   <div class="modal-content" style="max-width: 900px; height: 80%; max-height: 600px;">
+   <div class="modal-content" style="max-width: 900px; height: 90%; max-height: 90vh; width: 95%;">
     <div class="modal-header">
      <h2>💬 Messages</h2><button class="close-btn" onclick="closeMessages()">×</button>
     </div>
-    <div class="modal-body" style="padding: 0; height: calc(100% - 80px); display: flex;"><!-- Conversations List -->
-     <div id="conversations-list" style="width: 300px; border-right: 2px solid #F5F5DC; padding: 20px; overflow-y: auto;">
+    <div class="modal-body" style="padding: 0; height: calc(100% - 80px); display: flex; position: relative;"><!-- Mobile Back Button --> <button id="mobile-back-btn" onclick="showConversationsList()" style="display: none; position: absolute; top: 15px; left: 15px; z-index: 10; background: rgba(173, 216, 230, 0.9); border: none; padding: 8px 12px; border-radius: 20px; color: #8B4513; font-weight: 600; cursor: pointer; font-size: 14px;">← Back</button> <!-- Conversations List -->
+     <div id="conversations-list" style="width: 300px; border-right: 2px solid #F5F5DC; padding: 20px; overflow-y: auto; background-color: white;">
       <div style="margin-bottom: 20px;"><button class="btn" onclick="showNewMessageForm()" style="width: 100%; padding: 12px; font-size: 14px;">+ New Message</button>
       </div>
       <div id="conversations-container"><!-- Conversations will be loaded here -->
       </div>
      </div><!-- Chat Area -->
-     <div id="chat-area" style="flex: 1; display: flex; flex-direction: column;">
-      <div id="chat-header" style="padding: 20px; border-bottom: 2px solid #F5F5DC; background-color: #ADD8E6; display: none;">
-       <h3 id="chat-title" style="color: #8B4513; margin: 0;"></h3>
+     <div id="chat-area" style="flex: 1; display: flex; flex-direction: column; background-color: #FAFAFA;">
+      <div id="chat-header" style="padding: 20px; border-bottom: 2px solid #F5F5DC; background-color: #ADD8E6; display: none; position: relative;">
+       <h3 id="chat-title" style="color: #8B4513; margin: 0; padding-left: 0;"></h3>
        <p id="chat-subtitle" style="color: #654321; margin: 5px 0 0 0; font-size: 14px;"></p>
       </div>
       <div id="messages-container" style="flex: 1; padding: 20px; overflow-y: auto; background-color: #FAFAFA;">
@@ -1263,8 +1320,8 @@
        </div>
        <div id="chat-messages" style="display: none;"></div>
       </div>
-      <div id="message-input-area" style="padding: 20px; border-top: 2px solid #F5F5DC; background-color: white; display: none;">
-       <div style="display: flex; gap: 10px; align-items: end;"><textarea id="message-input" placeholder="Type your message..." rows="2" style="flex: 1; padding: 12px; border: 2px solid #ADD8E6; border-radius: 8px; font-size: 16px; color: #8B4513; resize: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;"></textarea> <button class="btn" onclick="sendMessage()" style="padding: 12px 20px; white-space: nowrap;">Send</button>
+      <div id="message-input-area" style="padding: 15px 20px; border-top: 2px solid #F5F5DC; background-color: white; display: none;">
+       <div style="display: flex; gap: 10px; align-items: end;"><textarea id="message-input" placeholder="Type your message..." rows="1" style="flex: 1; padding: 12px 16px; border: 2px solid #ADD8E6; border-radius: 25px; font-size: 16px; color: #8B4513; resize: none; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-height: 100px; min-height: 44px; line-height: 1.4;"></textarea> <button class="btn" onclick="sendMessage()" style="padding: 12px 20px; border-radius: 25px; white-space: nowrap; min-width: 80px;">Send</button>
        </div>
       </div>
      </div>
@@ -1477,7 +1534,7 @@
           ${imageHTML}
           <div class="property-content">
             <span class="property-type">${property.type || 'Property'}</span>
-            <h3 class="property-title">${property.type || 'Property'} in ${property.city || 'Location'}</h3>
+            <h3 class="property-title">${property.property_name || property.type || 'Property'}</h3>
             <p class="property-location">📍 ${property.address || 'Address not specified'}</p>
             <p class="property-price">₱${(property.monthly_rent || 0).toLocaleString()}/month</p>
             <div class="amenities-list">
@@ -1561,6 +1618,10 @@
         <div class="detail-section">
           <h3>Property Information</h3>
           <div class="detail-grid">
+            <div class="detail-item">
+              <div class="detail-label">Property Name</div>
+              <div class="detail-value">${property.property_name || 'N/A'}</div>
+            </div>
             <div class="detail-item">
               <div class="detail-label">Type</div>
               <div class="detail-value">${property.type || 'N/A'}</div>
@@ -2102,6 +2163,7 @@
       try {
         const propertyData = {
           landlord_id: currentUser.user_id,
+          property_name: document.getElementById('property-name').value,
           type: document.getElementById('property-type').value,
           monthly_rent: parseInt(document.getElementById('monthly-rent').value),
           available_slots: parseInt(document.getElementById('available-slots').value),
@@ -2143,6 +2205,7 @@
           
           // 2️⃣ Get all fields from the form and map it to other_column: 'otherValue'
           const updateData = {
+            property_name: propertyData.property_name,
             type: propertyData.type,
             monthly_rent: propertyData.monthly_rent,
             available_slots: propertyData.available_slots,
@@ -2436,9 +2499,12 @@
         </div>
       ` : '';
 
-      // Generate user list
-      const usersHTML = paginatedUsers.length > 0 ? paginatedUsers.map(user => `
-        <div style="background-color: #F5F5DC; padding: 20px; border-radius: 8px; margin-bottom: 15px;">
+      // Group users by status for better organization
+      const activeUsers = paginatedUsers.filter(u => u.status === 'Active');
+      const inactiveUsers = paginatedUsers.filter(u => u.status === 'Inactive');
+
+      const generateUserCard = (user, statusColor, statusBg) => `
+        <div style="background-color: ${statusBg}; border: 2px solid ${statusColor}; padding: 20px; border-radius: 8px; margin-bottom: 15px;">
           <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
             <div>
               <h4 style="color: #8B4513; margin-bottom: 10px;">${user.first_name} ${user.last_name}</h4>
@@ -2447,15 +2513,53 @@
               <p><strong>Type:</strong> ${user.role}</p>
               <p><strong>Joined:</strong> ${user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}</p>
             </div>
-            <span style="background-color: ${user.status === 'Active' ? '#32CD32' : '#FF6B6B'}; color: white; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: 600;">${user.status}</span>
+            <span style="background-color: ${statusColor}; color: white; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: 600;">${user.status}</span>
           </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <button class="btn" onclick="resetUserPassword('${user.user_id}', '${user.first_name} ${user.last_name}')" style="flex: 1; min-width: 120px; padding: 8px; font-size: 14px;">🔑 Reset Password</button>
-            <button class="btn" onclick="toggleUserStatus('${user.user_id}', '${user.status}', '${user.first_name} ${user.last_name}')" style="flex: 1; min-width: 120px; padding: 8px; font-size: 14px; background-color: ${user.status === 'Active' ? '#FF6B6B' : '#32CD32'};">${user.status === 'Active' ? '🚫 Deactivate' : '✅ Activate'}</button>
-            <button class="btn" onclick="messageUser('${user.user_id}', '${user.first_name} ${user.last_name}')" style="flex: 1; min-width: 120px; padding: 8px; font-size: 14px;">💬 Message</button>
+            <button class="btn-secondary" onclick="resetUserPassword('${user.user_id}', '${user.first_name} ${user.last_name}')" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px; background-color: #FFA500; color: white; border-color: #FFA500;">🔑 Reset Password</button>
+            <button class="btn-secondary" onclick="toggleUserStatus('${user.user_id}', '${user.status}', '${user.first_name} ${user.last_name}')" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px; background-color: ${user.status === 'Active' ? '#FF6B6B' : '#32CD32'}; color: white; border-color: ${user.status === 'Active' ? '#FF6B6B' : '#32CD32'};">${user.status === 'Active' ? '🚫 Deactivate' : '✅ Activate'}</button>
+            <button class="btn" onclick="messageUser('${user.user_id}', '${user.first_name} ${user.last_name}')" style="flex: 1; min-width: 120px; padding: 10px; font-size: 14px;">💬 Message</button>
           </div>
         </div>
-      `).join('') : '<p style="text-align: center; color: #8B4513; padding: 40px;">No users found matching your criteria</p>';
+      `;
+
+      // Generate user list
+      let usersHTML = '';
+      
+      if (userStatusFilter) {
+        // Show filtered status only
+        usersHTML = paginatedUsers.length > 0 ? paginatedUsers.map(user => {
+          const statusColors = {
+            'Active': { color: '#32CD32', bg: '#F0FFF0' },
+            'Inactive': { color: '#FF6B6B', bg: '#FFE4E1' }
+          };
+          const colors = statusColors[user.status] || { color: '#8B4513', bg: '#F5F5DC' };
+          return generateUserCard(user, colors.color, colors.bg);
+        }).join('') : '<p style="text-align: center; color: #8B4513; padding: 40px;">No users found matching your criteria</p>';
+      } else {
+        // Show all statuses with sections
+        if (activeUsers.length > 0) {
+          usersHTML += `
+            <div style="margin-bottom: 40px;">
+              <h3 style="color: #8B4513; margin-bottom: 20px; font-size: 20px; border-bottom: 2px solid #ADD8E6; padding-bottom: 10px;">✅ Active Users (${activeUsers.length})</h3>
+              ${activeUsers.map(user => generateUserCard(user, '#32CD32', '#F0FFF0')).join('')}
+            </div>
+          `;
+        }
+        
+        if (inactiveUsers.length > 0) {
+          usersHTML += `
+            <div style="margin-bottom: 40px;">
+              <h3 style="color: #8B4513; margin-bottom: 20px; font-size: 20px; border-bottom: 2px solid #ADD8E6; padding-bottom: 10px;">❌ Inactive Users (${inactiveUsers.length})</h3>
+              ${inactiveUsers.map(user => generateUserCard(user, '#FF6B6B', '#FFE4E1')).join('')}
+            </div>
+          `;
+        }
+        
+        if (paginatedUsers.length === 0) {
+          usersHTML = '<p style="text-align: center; color: #8B4513; padding: 40px;">No users found matching your criteria</p>';
+        }
+      }
 
       usersList.innerHTML = controlsHTML + usersHTML + paginationHTML;
     }
@@ -2560,7 +2664,7 @@
         <div style="background-color: ${statusBg}; border: 2px solid ${statusColor}; padding: 20px; border-radius: 8px; margin-bottom: 15px;">
           <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
             <div>
-              <h4 style="color: #8B4513; margin-bottom: 10px;">${prop.type} - ${prop.city}</h4>
+              <h4 style="color: #8B4513; margin-bottom: 10px;">${prop.property_name || prop.type} - ${prop.city}</h4>
               <p><strong>Address:</strong> ${prop.address}</p>
               <p><strong>Landlord:</strong> ${prop.landlord.first_name} ${prop.landlord.last_name}</p>
               <p><strong>Contact:</strong> ${prop.landlord.email} | ${prop.landlord.mobile || 'N/A'}</p>
@@ -2743,7 +2847,7 @@
         const propertiesList = document.getElementById('landlord-properties-list');
         propertiesList.innerHTML = properties?.map(prop => `
           <div style="background-color: #F5F5DC; padding: 20px; border-radius: 8px; margin-bottom: 15px;">
-            <h4 style="color: #8B4513; margin-bottom: 10px;">${prop.type} - ${prop.city}</h4>
+            <h4 style="color: #8B4513; margin-bottom: 10px;">${prop.property_name || prop.type} - ${prop.city}</h4>
             <p><strong>Address:</strong> ${prop.address}</p>
             <p><strong>Rent:</strong> ₱${prop.monthly_rent?.toLocaleString()}/month</p>
             <p><strong>Status:</strong> ${prop.status}</p>
@@ -2792,7 +2896,7 @@
           <div style="background-color: #F5F5DC; padding: 20px; border-radius: 8px; margin-bottom: 15px;">
             <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
               <div>
-                <h4 style="color: #8B4513; margin-bottom: 5px;">${app.property.type} - ${app.property.city}</h4>
+                <h4 style="color: #8B4513; margin-bottom: 5px;">${app.property.property_name || app.property.type} - ${app.property.city}</h4>
                 <p style="margin-bottom: 5px;"><strong>Address:</strong> ${app.property.address}</p>
                 <p style="margin-bottom: 5px;"><strong>Rent:</strong> ₱${app.property.monthly_rent?.toLocaleString()}/month</p>
                 <p style="margin-bottom: 5px;"><strong>Landlord:</strong> ${app.property.landlord.first_name} ${app.property.landlord.last_name}</p>
@@ -2928,6 +3032,7 @@
           document.querySelectorAll('input[name="amenity"]').forEach(cb => cb.checked = false);
 
           // 5️⃣ Populate form fields with existing data from fromDB
+          document.getElementById('property-name').value = fromDB.property_name || '';
           document.getElementById('property-type').value = fromDB.type || '';
           document.getElementById('monthly-rent').value = fromDB.monthly_rent || '';
           document.getElementById('available-slots').value = fromDB.available_slots || '';
@@ -3140,7 +3245,7 @@
         applicantsModal.innerHTML = `
           <div style="background: white; border-radius: 12px; max-width: 800px; width: 100%; max-height: 90%; overflow-y: auto;">
             <div style="background-color: #ADD8E6; padding: 20px; display: flex; justify-content: space-between; align-items: center; border-radius: 12px 12px 0 0;">
-              <h2 style="color: #8B4513; margin: 0;">Applicants for ${property.type} - ${property.city}</h2>
+              <h2 style="color: #8B4513; margin: 0;">Applicants for ${property.property_name || property.type} - ${property.city}</h2>
               <button onclick="this.closest('div[style*=fixed]').remove()" style="background: none; border: none; font-size: 30px; color: #8B4513; cursor: pointer; line-height: 1;">&times;</button>
             </div>
             <div style="padding: 30px;">
@@ -4190,7 +4295,7 @@
           ${imageHTML}
           <div class="property-content">
             <span class="property-type">${property.type || 'Property'}</span>
-            <h3 class="property-title">${property.type || 'Property'} in ${property.city || 'Location'}</h3>
+            <h3 class="property-title">${property.property_name || property.type || 'Property'}</h3>
             <p class="property-location">📍 ${property.address || 'Address not specified'}</p>
             <p class="property-price">₱${(property.monthly_rent || 0).toLocaleString()}/month</p>
             <div class="amenities-list">
@@ -4865,9 +4970,37 @@
         document.getElementById('chat-header').style.display = 'block';
         document.getElementById('chat-messages').style.display = 'block';
         document.getElementById('message-input-area').style.display = 'block';
+
+        // Mobile: Hide conversations list and show chat
+        if (window.innerWidth <= 768) {
+          showChatArea();
+        }
       } catch (error) {
         console.error('Error selecting conversation:', error);
       }
+    }
+
+    function showChatArea() {
+      const conversationsList = document.getElementById('conversations-list');
+      const chatArea = document.getElementById('chat-area');
+      
+      conversationsList.classList.add('mobile-hidden');
+      chatArea.classList.add('mobile-visible');
+    }
+
+    function showConversationsList() {
+      const conversationsList = document.getElementById('conversations-list');
+      const chatArea = document.getElementById('chat-area');
+      
+      conversationsList.classList.remove('mobile-hidden');
+      chatArea.classList.remove('mobile-visible');
+      
+      // Reset chat interface
+      document.getElementById('no-chat-selected').style.display = 'flex';
+      document.getElementById('chat-header').style.display = 'none';
+      document.getElementById('chat-messages').style.display = 'none';
+      document.getElementById('message-input-area').style.display = 'none';
+      currentConversation = null;
     }
 
     function displaySampleChat(conversationId) {
@@ -5142,7 +5275,7 @@
       }
     }
 
-    // Message input enter key handler
+    // Message input enter key handler and auto-resize
     document.addEventListener('DOMContentLoaded', function() {
       const messageInput = document.getElementById('message-input');
       if (messageInput) {
@@ -5151,6 +5284,12 @@
             e.preventDefault();
             sendMessage();
           }
+        });
+
+        // Auto-resize textarea
+        messageInput.addEventListener('input', function() {
+          this.style.height = 'auto';
+          this.style.height = Math.min(this.scrollHeight, 100) + 'px';
         });
       }
     });
@@ -5178,6 +5317,12 @@
       document.getElementById('chat-messages').style.display = 'none';
       document.getElementById('message-input-area').style.display = 'none';
       currentConversation = null;
+
+      // Reset mobile layout
+      const conversationsList = document.getElementById('conversations-list');
+      const chatArea = document.getElementById('chat-area');
+      conversationsList.classList.remove('mobile-hidden');
+      chatArea.classList.remove('mobile-visible');
     }
 
     function showNewMessageForm() {
@@ -5660,6 +5805,143 @@
       }
     }
 
+    function editUser(userId, firstName, lastName, email, mobile, role, status) {
+      const editModal = document.createElement('div');
+      editModal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto;';
+      editModal.innerHTML = `
+        <div style="background: white; border-radius: 12px; max-width: 600px; width: 100%; max-height: 90%; overflow-y: auto;">
+          <div style="background-color: #ADD8E6; padding: 20px; display: flex; justify-content: space-between; align-items: center; border-radius: 12px 12px 0 0;">
+            <h2 style="color: #8B4513; margin: 0;">Edit User: ${firstName} ${lastName}</h2>
+            <button onclick="this.closest('div[style*=fixed]').remove()" style="background: none; border: none; font-size: 30px; color: #8B4513; cursor: pointer; line-height: 1;">&times;</button>
+          </div>
+          <div style="padding: 30px;">
+            <form onsubmit="saveUserChanges(event, '${userId}')">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div>
+                  <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #8B4513;">First Name</label>
+                  <input type="text" id="edit-firstname" value="${firstName}" required style="width: 100%; padding: 12px; border: 2px solid #ADD8E6; border-radius: 8px; font-size: 16px; color: #8B4513;">
+                </div>
+                <div>
+                  <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #8B4513;">Last Name</label>
+                  <input type="text" id="edit-lastname" value="${lastName}" required style="width: 100%; padding: 12px; border: 2px solid #ADD8E6; border-radius: 8px; font-size: 16px; color: #8B4513;">
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #8B4513;">Email</label>
+                <input type="email" id="edit-email" value="${email}" required style="width: 100%; padding: 12px; border: 2px solid #ADD8E6; border-radius: 8px; font-size: 16px; color: #8B4513;">
+              </div>
+              
+              <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #8B4513;">Mobile</label>
+                <input type="tel" id="edit-mobile" value="${mobile || ''}" style="width: 100%; padding: 12px; border: 2px solid #ADD8E6; border-radius: 8px; font-size: 16px; color: #8B4513;">
+              </div>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div>
+                  <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #8B4513;">Role</label>
+                  <select id="edit-role" style="width: 100%; padding: 12px; border: 2px solid #ADD8E6; border-radius: 8px; font-size: 16px; color: #8B4513;">
+                    <option value="Admin" ${role === 'Admin' ? 'selected' : ''}>Admin</option>
+                    <option value="Landlord" ${role === 'Landlord' ? 'selected' : ''}>Landlord</option>
+                    <option value="Tenant" ${role === 'Tenant' ? 'selected' : ''}>Tenant</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #8B4513;">Status</label>
+                  <select id="edit-status" style="width: 100%; padding: 12px; border: 2px solid #ADD8E6; border-radius: 8px; font-size: 16px; color: #8B4513;">
+                    <option value="Active" ${status === 'Active' ? 'selected' : ''}>Active</option>
+                    <option value="Inactive" ${status === 'Inactive' ? 'selected' : ''}>Inactive</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 30px;">
+                <h3 style="color: #8B4513; margin-bottom: 15px;">Admin Actions</h3>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                  <button type="button" class="btn-secondary" onclick="resetUserPasswordFromEdit('${userId}', '${firstName} ${lastName}')" style="flex: 1; min-width: 150px; padding: 12px; font-size: 14px; background-color: #FFA500; color: white; border-color: #FFA500;">🔑 Reset Password</button>
+                  <button type="button" class="btn-secondary" onclick="toggleUserStatusFromEdit('${userId}', '${status}', '${firstName} ${lastName}')" style="flex: 1; min-width: 150px; padding: 12px; font-size: 14px; background-color: ${status === 'Active' ? '#FF6B6B' : '#32CD32'}; color: white; border-color: ${status === 'Active' ? '#FF6B6B' : '#32CD32'};">${status === 'Active' ? '🚫 Deactivate' : '✅ Activate'}</button>
+                  <button type="button" class="btn" onclick="messageUserFromEdit('${userId}', '${firstName} ${lastName}')" style="flex: 1; min-width: 150px; padding: 12px; font-size: 14px;">💬 Send Message</button>
+                </div>
+              </div>
+              
+              <div style="display: flex; gap: 15px;">
+                <button type="button" class="btn-secondary" onclick="this.closest('div[style*=fixed]').remove()" style="flex: 1; padding: 15px; font-size: 16px;">Cancel</button>
+                <button type="submit" class="btn" style="flex: 1; padding: 15px; font-size: 16px;">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(editModal);
+    }
+
+    async function saveUserChanges(event, userId) {
+      event.preventDefault();
+      
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving...';
+
+      try {
+        const updateData = {
+          first_name: document.getElementById('edit-firstname').value,
+          last_name: document.getElementById('edit-lastname').value,
+          email: document.getElementById('edit-email').value,
+          mobile: document.getElementById('edit-mobile').value,
+          role: document.getElementById('edit-role').value,
+          status: document.getElementById('edit-status').value
+        };
+
+        const { error } = await supabase
+          .from('users')
+          .update(updateData)
+          .eq('user_id', userId);
+
+        if (error) throw error;
+
+        // 🔔 Create notification for user - profile updated by admin
+        await createNotification(
+          userId,
+          'Profile Updated by Admin',
+          `Your profile information has been updated by an administrator. Please review your account details and contact support if you have any questions.`
+        );
+
+        showToast('User updated successfully!');
+        document.querySelector('div[style*="position: fixed"]')?.remove();
+        loadAdminDashboard(); // Refresh the dashboard
+        
+      } catch (error) {
+        console.error('Error updating user:', error);
+        showToast('Failed to update user: ' + error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
+      }
+    }
+
+    function resetUserPasswordFromEdit(userId, userName) {
+      // Close the edit modal first
+      document.querySelector('div[style*="position: fixed"]')?.remove();
+      
+      // Open the reset password modal
+      resetUserPassword(userId, userName);
+    }
+
+    function toggleUserStatusFromEdit(userId, currentStatus, userName) {
+      // Close the edit modal first
+      document.querySelector('div[style*="position: fixed"]')?.remove();
+      
+      // Open the toggle status modal
+      toggleUserStatus(userId, currentStatus, userName);
+    }
+
+    function messageUserFromEdit(userId, userName) {
+      // Close the edit modal first
+      document.querySelector('div[style*="position: fixed"]')?.remove();
+      
+      // Open the message modal
+      messageUser(userId, userName);
+    }
+
     function messageUser(userId, userName) {
       if (!currentUser) {
         showToast('Please log in to send messages');
@@ -5865,5 +6147,5 @@
     checkAuthState();
     loadProperties();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99dcc059147cb9fb',t:'MTc2MzAyMDk5My4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99dd593b55ce9aaf',t:'MTc2MzAyNzI1Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
