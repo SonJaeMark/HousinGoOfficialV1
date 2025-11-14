@@ -33,7 +33,7 @@
 
     /* Header Styles */
     header {
-      background-color: #ADD8E6;
+      background-color: #FFFFFF;
       padding: 20px 0;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
       position: sticky;
@@ -65,7 +65,7 @@
     nav a {
       color: #8B4513;
       text-decoration: none;
-      font-weight: 500;
+      font-weight: 700;
       transition: color 0.3s;
     }
 
@@ -135,7 +135,7 @@
 
     /* Hero Section */
     .hero {
-      background: linear-gradient(135deg, rgba(173, 216, 230, 0.9) 0%, rgba(135, 206, 235, 0.9) 100%), url('assets/hero_section_bg.jpg');
+      background: linear-gradient(135deg, rgba(173, 216, 230, 0.4) 0%, rgba(135, 206, 235, 0.4) 100%), url('assets/hero_section_bg.jpg');
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
@@ -145,9 +145,10 @@
     }
 
     .hero h1 {
-      font-size: 48px;
+      font-size: 64px;
       margin-bottom: 20px;
       color: #8B4513;
+      font-weight: 900;
     }
 
     .hero p {
@@ -159,7 +160,10 @@
     .search-bar {
       max-width: 900px;
       margin: 0 auto;
-      background-color: #FFFFFF;
+      background: rgba(255, 255, 255, 0.25);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
       border-radius: 50px;
       padding: 8px;
       box-shadow: 0 8px 30px rgba(0,0,0,0.15);
@@ -818,7 +822,7 @@
   <header>
    <div class="container">
     <div class="header-content">
-     <div class="logo" id="site-name"><img src="assets/logo.png" alt="HousinGo" style="height: 40px; width: auto; vertical-align: middle;">
+     <div class="logo" id="site-name"><img src="assets/logo.svg" alt="HousinGo" style="height: 40px; width: auto; vertical-align: middle;">
      </div>
      <div class="hamburger" id="hamburger"><span></span> <span></span> <span></span>
      </div>
@@ -831,14 +835,16 @@
        <li><a href="#" onclick="showPage('contact'); return false;">Contact Us</a></li>
        <li><a href="#" onclick="showPage('help'); return false;">Help</a></li>
       </ul>
-     </nav><!-- Live Chat Status Indicator -->
-     <div id="chat-status-indicator" style="display: none; position: fixed; bottom: 20px; right: 20px; background: linear-gradient(135deg, #32CD32 0%, #228B22 100%); color: white; padding: 12px 20px; border-radius: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2000; font-size: 14px; font-weight: 600;">
-      <div style="display: flex; align-items: center; gap: 8px;">
-       <div style="width: 8px; height: 8px; background: white; border-radius: 50%; animation: pulse 2s infinite;"></div><span>Live Chat Active</span>
+     </nav><!-- Floating Chat Button -->
+     <div id="floating-chat-button" style="position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: none;"><button onclick="showMessages()" onmouseover="this.style.transform='scale(1.1)'; this.style.boxShadow='0 6px 25px rgba(0,0,0,0.4)'" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 20px rgba(0,0,0,0.3)'" style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #ADD8E6 0%, #87CEEB 100%); border: 3px solid white; box-shadow: 0 4px 20px rgba(0,0,0,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 24px; transition: all 0.3s ease; position: relative;"> 💬 <span id="floating-messages-badge" style="display: none; position: absolute; top: -5px; right: -5px; background: #FF6B6B; color: white; border-radius: 50%; width: 24px; height: 24px; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; border: 2px solid white; animation: pulse 2s infinite;">0</span> </button> <!-- Live Chat Status Indicator -->
+      <div id="chat-status-indicator" style="position: absolute; bottom: 70px; right: 0; background: linear-gradient(135deg, #32CD32 0%, #228B22 100%); color: white; padding: 8px 12px; border-radius: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); font-size: 12px; font-weight: 600; white-space: nowrap; display: none;">
+       <div style="display: flex; align-items: center; gap: 6px;">
+        <div style="width: 6px; height: 6px; background: white; border-radius: 50%; animation: pulse 2s infinite;"></div><span>Live Chat</span>
+       </div>
       </div>
      </div><!-- User Profile Dropdown (Hidden by default) -->
      <div id="user-profile-dropdown" style="display: none; position: relative;"><button id="profile-btn" onclick="toggleProfileDropdown()" style="background: none; border: none; color: #8B4513; font-size: 16px; font-weight: 600; cursor: pointer; padding: 10px 15px; border-radius: 8px; transition: background-color 0.3s; position: relative;"> <span id="user-name-display">👤 User</span> ▼ <span id="user-notification-indicator" style="display: none; position: absolute; top: 8px; right: 8px; background: #FF4444; width: 8px; height: 8px; border-radius: 50%; border: 2px solid white;"></span> </button>
-      <div id="profile-dropdown-menu" style="display: none; position: absolute; top: 100%; right: 0; background: white; border: 2px solid #ADD8E6; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); min-width: 200px; z-index: 1001;"><a href="#" onclick="showPage('user-settings'); return false;" style="display: block; padding: 12px 20px; color: #8B4513; text-decoration: none; border-bottom: 1px solid #F5F5DC; transition: background-color 0.3s;">⚙️ Settings</a> <a href="#" onclick="showNotifications(); return false;" style="display: block; padding: 12px 20px; color: #8B4513; text-decoration: none; border-bottom: 1px solid #F5F5DC; transition: background-color 0.3s; position: relative;"> 🔔 Notifications <span id="notification-badge" style="display: none; position: absolute; top: 8px; right: 15px; background: #FF6B6B; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; text-align: center; line-height: 20px;">0</span> </a> <a href="#" onclick="showMessages(); return false;" style="display: block; padding: 12px 20px; color: #8B4513; text-decoration: none; border-bottom: 1px solid #F5F5DC; transition: background-color 0.3s; position: relative;"> 💬 Messages <span id="messages-badge" style="display: none; position: absolute; top: 8px; right: 15px; background: #FF6B6B; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; text-align: center; line-height: 20px;">0</span> </a> <a href="#" onclick="logout(); return false;" style="display: block; padding: 12px 20px; color: #8B4513; text-decoration: none; transition: background-color 0.3s;">🚪 Logout</a>
+      <div id="profile-dropdown-menu" style="display: none; position: absolute; top: 100%; right: 0; background: white; border: 2px solid #ADD8E6; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); min-width: 200px; z-index: 1001;"><a href="#" onclick="showPage('user-settings'); return false;" style="display: block; padding: 12px 20px; color: #8B4513; text-decoration: none; border-bottom: 1px solid #F5F5DC; transition: background-color 0.3s;">⚙️ Settings</a> <a href="#" onclick="showNotifications(); return false;" style="display: block; padding: 12px 20px; color: #8B4513; text-decoration: none; border-bottom: 1px solid #F5F5DC; transition: background-color 0.3s; position: relative;"> 🔔 Notifications <span id="notification-badge" style="display: none; position: absolute; top: 8px; right: 15px; background: #FF6B6B; color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; text-align: center; line-height: 20px;">0</span> </a> <a href="#" onclick="logout(); return false;" style="display: block; padding: 12px 20px; color: #8B4513; text-decoration: none; transition: background-color 0.3s;">🚪 Logout</a>
       </div>
      </div>
     </div>
@@ -856,7 +862,7 @@
     </div>
    </div>
   </section>
-  <main class="container" id="home-content">
+  <main id="home-content" style="max-width: 70%; margin: 0 auto; padding: 0 20px;">
    <div class="filters">
     <div class="filter-buttons"><button class="filter-btn active" data-type="">🏘️ All Properties</button> <button class="filter-btn" data-type="Bed Spacer">🛏️ Bed Spacer</button> <button class="filter-btn" data-type="Single Room">🚪 Single Room</button> <button class="filter-btn" data-type="Boarding House">🏢 Boarding House</button> <button class="filter-btn" data-type="Single Family">🏠 Single Family</button> <button class="filter-btn" data-type="Studio Type">🏠 Studio Type</button>
     </div>
@@ -1348,8 +1354,6 @@
   </div>
   <footer>
    <div class="footer-content">
-    <div class="footer-links"><a href="#" onclick="showPage('home'); return false;">Home</a> <a href="#" onclick="showPage('browse-properties'); return false;">Browse Properties</a> <a href="#" onclick="showPage('about'); return false;">About Us</a> <a href="#" onclick="showPage('contact'); return false;">Contact Us</a> <a href="#" onclick="showPage('help'); return false;">Help</a>
-    </div>
     <p class="footer-text" id="footer-copyright">© 2025 HousinGo | All Rights Reserved</p>
     <p class="footer-text">Contact Email: <span id="contact-email">support@housingo.ph</span></p>
    </div>
@@ -1542,8 +1546,8 @@
               ${amenities.length > 4 ? `<span class="amenity-tag">+${amenities.length - 4} more</span>` : ''}
             </div>
             <div class="property-actions">
-              <button class="btn-secondary" onclick="event.stopPropagation(); viewDetails('${property.property_id}')">View Details</button>
-              <button class="btn-secondary" onclick="event.stopPropagation(); contactLandlord('${property.property_id}')">Contact</button>
+              <button class="btn-secondary" onclick="event.stopPropagation(); viewDetails('${property.property_id}')">View</button>
+              <button class="btn-secondary" onclick="event.stopPropagation(); messageLandlordFromCard('${property.property_id}')">Message</button>
             </div>
           </div>
         `;
@@ -1790,6 +1794,49 @@
         `;
         document.body.appendChild(message);
         setTimeout(() => message.remove(), 5000);
+      }
+    }
+
+    function messageLandlordFromCard(propertyId) {
+      if (!currentUser) {
+        // Close any open modals first
+        document.getElementById('property-modal').classList.remove('active');
+        
+        // Show login redirect message
+        const loginRedirectDiv = document.createElement('div');
+        loginRedirectDiv.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+        loginRedirectDiv.innerHTML = `
+          <div style="background: white; padding: 40px; border-radius: 12px; max-width: 400px; text-align: center;">
+            <h3 style="color: #8B4513; margin-bottom: 20px;">Login Required</h3>
+            <p style="margin-bottom: 30px; color: #654321;">You need to log in to message landlords. Would you like to go to the login page now?</p>
+            <div style="display: flex; gap: 15px;">
+              <button class="btn-secondary" onclick="this.closest('div[style*=fixed]').remove()" style="flex: 1; padding: 12px;">Cancel</button>
+              <button class="btn" onclick="redirectToLogin()" style="flex: 1; padding: 12px;">Go to Login</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(loginRedirectDiv);
+        return;
+      }
+
+      const property = allProperties.find(p => p.property_id === propertyId);
+      if (property && property.landlord) {
+        const landlordName = `${property.landlord.first_name} ${property.landlord.last_name}`;
+        
+        // Set the recipient and show new message modal
+        selectedRecipient = {
+          userId: property.landlord.user_id,
+          name: landlordName,
+          email: property.landlord.email || '',
+          role: 'Landlord'
+        };
+        
+        document.getElementById('recipient-search').value = `${landlordName} (Landlord)`;
+        document.getElementById('initial-message').value = `Hi! I'm interested in your ${property.type} property in ${property.city}. Could we discuss the details?`;
+        
+        showNewMessageForm();
+      } else {
+        showToast('Unable to message landlord. Property information not available.');
       }
     }
 
@@ -4303,8 +4350,8 @@
               ${amenities.length > 4 ? `<span class="amenity-tag">+${amenities.length - 4} more</span>` : ''}
             </div>
             <div class="property-actions">
-              <button class="btn-secondary" onclick="event.stopPropagation(); viewDetails('${property.property_id}')">View Details</button>
-              <button class="btn-secondary" onclick="event.stopPropagation(); contactLandlord('${property.property_id}')">Contact</button>
+              <button class="btn-secondary" onclick="event.stopPropagation(); viewDetails('${property.property_id}')">View</button>
+              <button class="btn-secondary" onclick="event.stopPropagation(); messageLandlordFromCard('${property.property_id}')">Message</button>
             </div>
           </div>
         `;
@@ -4468,10 +4515,16 @@
         }
       }, 3000);
       
-      // Show live chat indicator
-      const indicator = document.getElementById('chat-status-indicator');
-      if (indicator) {
-        indicator.style.display = 'block';
+      // Show floating chat button and live chat indicator only if user is logged in
+      if (currentUser) {
+        const floatingButton = document.getElementById('floating-chat-button');
+        const indicator = document.getElementById('chat-status-indicator');
+        if (floatingButton) {
+          floatingButton.style.display = 'block';
+        }
+        if (indicator) {
+          indicator.style.display = 'block';
+        }
       }
       
       console.log('✅ Live message polling started');
@@ -4482,8 +4535,12 @@
         clearInterval(messagePollingInterval);
         messagePollingInterval = null;
         
-        // Hide live chat indicator
+        // Hide floating chat button and live chat indicator
+        const floatingButton = document.getElementById('floating-chat-button');
         const indicator = document.getElementById('chat-status-indicator');
+        if (floatingButton) {
+          floatingButton.style.display = 'none';
+        }
         if (indicator) {
           indicator.style.display = 'none';
         }
@@ -4919,13 +4976,13 @@
 
     function updateMessagesBadge() {
       const unreadCount = userConversations.reduce((total, conv) => total + conv.unreadCount, 0);
-      const badge = document.getElementById('messages-badge');
+      const floatingBadge = document.getElementById('floating-messages-badge');
       
       if (unreadCount > 0) {
-        badge.style.display = 'block';
-        badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+        floatingBadge.style.display = 'flex';
+        floatingBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
       } else {
-        badge.style.display = 'none';
+        floatingBadge.style.display = 'none';
       }
     }
 
@@ -6147,5 +6204,5 @@
     checkAuthState();
     loadProperties();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99dde15706076592',t:'MTc2MzAzMjgzMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99e69f27a373bc39',t:'MTc2MzEyNDQ5MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
