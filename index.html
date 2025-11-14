@@ -822,7 +822,7 @@
   <header>
    <div class="container">
     <div class="header-content">
-     <div class="logo" id="site-name"><img src="assets/logo.svg" alt="HousinGo" style="height: 40px; width: auto; vertical-align: middle;">
+     <div class="logo" id="site-name"><img src="assets/logo.png" alt="HousinGo" style="height: 40px; width: auto; vertical-align: middle;">
      </div>
      <div class="hamburger" id="hamburger"><span></span> <span></span> <span></span>
      </div>
@@ -1423,6 +1423,7 @@
             )
           `)
           .eq('availability', 'Available')
+          .eq('status', 'Approved')
           .order('created_at', { ascending: false });
 
         if (propError) {
@@ -2235,22 +2236,23 @@
           console.log('Property ID:', propertyId);
           console.log('Current User ID:', currentUser.user_id);
           
-          // 1️⃣ Get first all data from database and store it to fromDB to populate the edit form
+          // 1️⃣ Verify property ownership first
           const { data: fromDB, error: checkError } = await supabase
             .from('properties')
             .select('*')
             .eq('property_id', propertyId)
-            .eq('landlord_id', currentUser.user_id)
-            .single();
+            .eq('landlord_id', currentUser.user_id);
           
           console.log('✅ Existing property verification from DB:', fromDB);
           console.log('❌ Verification error:', checkError);
           
-          if (checkError || !fromDB) {
+          if (checkError || !fromDB || fromDB.length === 0) {
             throw new Error('Property not found or you do not have permission to edit it');
           }
           
-          // 2️⃣ Get all fields from the form and map it to other_column: 'otherValue'
+          const existingProperty = fromDB[0];
+          
+          // 2️⃣ Prepare update data - keep existing status unless it was rejected
           const updateData = {
             property_name: propertyData.property_name,
             type: propertyData.type,
@@ -2266,18 +2268,20 @@
             contact_number: propertyData.contact_number,
             move_in_date: propertyData.move_in_date,
             min_stay: propertyData.min_stay,
-            status: "Approved",
             loc_link: propertyData.loc_link,
-            availability: propertyData.availability
+            availability: propertyData.availability,
+            // Keep existing status unless it was rejected (then set to pending for re-review)
+            status: existingProperty.status === 'Rejected' ? 'Pending' : existingProperty.status
           };
           
           console.log('📝 Update data mapped from form:', updateData);
           
-          // 3️⃣ Perform the edit using Supabase documentation pattern
+          // 3️⃣ Perform the update with proper ownership verification using correct Supabase syntax
           const { data, error } = await supabase
             .from('properties')
             .update(updateData)
             .eq('property_id', propertyId)
+            .eq('landlord_id', currentUser.user_id)
             .select();
 
           console.log('✅ Update response data:', data);
@@ -2289,17 +2293,34 @@
           }
           
           if (!data || data.length === 0) {
-            throw new Error('Property update failed - no data returned');
+            throw new Error('Property update failed - no data returned or permission denied');
           }
           
-          property = data[0]; // Get first item from array
+          property = data[0];
           console.log('✅ Property updated successfully!');
-          console.log('Updated contact_name:', property.contact_name);
+          console.log('Updated property:', property);
+          
+          // 🔔 Create notification for landlord - property updated
+          await createNotification(
+            currentUser.user_id,
+            'Property Updated Successfully',
+            `Your ${property.type} property in ${property.city} has been updated successfully. ${property.status === 'Pending' ? 'It has been resubmitted for admin review.' : 'Changes are now live.'}`
+          );
+
+          // 🔔 Notify admins if property was resubmitted for review
+          if (existingProperty.status === 'Rejected' && property.status === 'Pending') {
+            await notifyAllAdmins(
+              'Property Resubmitted for Review',
+              `${currentUser.first_name} ${currentUser.last_name} has updated and resubmitted their ${property.type} property in ${property.city} for review.`
+            );
+          }
+          
           console.log('=== END UPDATE PROPERTY DEBUG ===');
         } else {
-          // 3️⃣ Create new property
+          // Create new property
           console.log('🆕 Creating new property...');
           propertyData.status = 'Pending';
+          propertyData.created_at = new Date().toISOString();
           
           const { data, error: propError } = await supabase
             .from('properties')
@@ -2325,7 +2346,7 @@
           );
         }
 
-        // Upload images to ImgBB
+        // Upload new images if any
         const imageFiles = document.getElementById('property-images').files;
         if (imageFiles.length > 0) {
           submitBtn.textContent = `Uploading images (0/${imageFiles.length})...`;
@@ -2351,7 +2372,7 @@
           }
         }
 
-        // 4️⃣ Update amenities - delete existing ones first to prevent duplicates
+        // Update amenities - delete existing ones first to prevent duplicates
         console.log('=== AMENITIES UPDATE DEBUG ===');
         console.log('🗑️ Deleting existing amenities for property:', property.property_id);
         
@@ -2367,7 +2388,7 @@
         
         console.log('✅ Existing amenities deleted successfully');
 
-        // 5️⃣ Insert new amenities
+        // Insert new amenities
         const amenityCheckboxes = document.querySelectorAll('input[name="amenity"]:checked');
         const amenities = Array.from(amenityCheckboxes).map(cb => ({
           property_id: property.property_id,
@@ -2396,6 +2417,9 @@
         console.log('=== END AMENITIES UPDATE DEBUG ===');
 
         showToast(isEditMode ? 'Property updated successfully!' : 'Property posted successfully! Waiting for admin approval.');
+        
+        // Refresh the properties data
+        await loadProperties();
         
         setTimeout(() => {
           showPage('landlord-dashboard');
@@ -3871,6 +3895,7 @@
     // 🔔 Helper function to create notifications
     async function createNotification(userId, title, message) {
       try {
+        const currentTimestamp = new Date().toISOString();
         const { data, error } = await supabase
           .from('notifications')
           .insert([{
@@ -3878,7 +3903,7 @@
             title: title,
             message: message,
             is_read: false,
-            sent_at: new Date().toISOString()
+            sent_at: currentTimestamp
           }])
           .select()
           .single();
@@ -3912,12 +3937,13 @@
         }
 
         // Create notifications for all admins
+        const currentTimestamp = new Date().toISOString();
         const notifications = admins.map(admin => ({
           user_id: admin.user_id,
           title: title,
           message: message,
           is_read: false,
-          sent_at: new Date().toISOString()
+          sent_at: currentTimestamp
         }));
 
         if (notifications.length > 0) {
@@ -3940,6 +3966,8 @@
       if (!currentUser) return;
 
       try {
+        console.log('🔔 Loading notifications for user:', currentUser.user_id);
+        
         // Load notifications from database
         const { data: notifications, error } = await supabase
           .from('notifications')
@@ -3954,9 +3982,20 @@
           userNotifications = sampleNotifications;
         } else {
           userNotifications = notifications || [];
+          console.log(`📊 Loaded ${userNotifications.length} notifications from database`);
+          if (userNotifications.length > 0) {
+            console.log('🔔 Notifications details:', userNotifications.slice(0, 3).map(n => ({
+              id: n.notif_id,
+              title: n.title,
+              sent_at: n.sent_at,
+              is_read: n.is_read
+            })));
+          }
         }
         
         const unreadCount = userNotifications.filter(n => !n.is_read).length;
+        console.log(`📈 Unread notifications count: ${unreadCount}`);
+        
         const badge = document.getElementById('notification-badge');
         const userIndicator = document.getElementById('user-notification-indicator');
         
@@ -4090,8 +4129,20 @@
       }
 
       container.innerHTML = notifications.map(notification => {
-        const timeAgo = getTimeAgo(notification.sent_at);
+        // Use actual timestamp from database for notifications
+        const rawTimestamp = notification.sent_at;
+        const notificationTime = rawTimestamp ? new Date(rawTimestamp) : new Date();
+        
+        // Validate the parsed timestamp
+        if (isNaN(notificationTime.getTime())) {
+          console.warn(`⚠️ Invalid notification timestamp: ${rawTimestamp} for notification: ${notification.notif_id}`);
+          notificationTime = new Date(); // Fallback to current time
+        }
+        
+        const timeAgo = getTimeAgo(notificationTime);
         const statusClass = notification.is_read ? 'read' : 'unread';
+        
+        console.log(`🔔 Notification display: id=${notification.notif_id}, raw_timestamp=${rawTimestamp}, parsed=${notificationTime.toISOString()}, timeAgo=${timeAgo}`);
         
         return `
           <div class="notification-item ${statusClass}" onclick="markAsRead('${notification.notif_id}')">
@@ -4110,12 +4161,15 @@
 
     function getTimeAgo(timestamp) {
       const now = new Date();
-      const diff = now - timestamp;
+      const messageTime = new Date(timestamp);
+      const diff = now - messageTime;
       const minutes = Math.floor(diff / (1000 * 60));
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-      if (minutes < 60) {
+      if (minutes < 1) {
+        return 'Just now';
+      } else if (minutes < 60) {
         return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
       } else if (hours < 24) {
         return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
@@ -4507,7 +4561,11 @@
       }
     }
 
-    function startMessagePolling() {
+    async function startMessagePolling() {
+      // Initialize lastMessageCheck to current time to avoid showing old messages as new
+      lastMessageCheck = new Date();
+      console.log(`🕒 Initialized lastMessageCheck to: ${lastMessageCheck.toISOString()}`);
+      
       // Poll for new messages every 3 seconds
       messagePollingInterval = setInterval(async () => {
         if (currentUser) {
@@ -4551,7 +4609,9 @@
 
     async function checkForNewMessages() {
       try {
-        // Get messages newer than last check
+        console.log(`🔍 Checking for new messages since: ${lastMessageCheck.toISOString()}`);
+        
+        // Get messages newer than last check - use gt (greater than) instead of gte to avoid duplicates
         const { data: newMessages, error } = await supabase
           .from('messages')
           .select(`
@@ -4561,16 +4621,27 @@
           `)
           .eq('receiver_id', currentUser.user_id)
           .eq('is_read', false)
-          .gte('sent_at', lastMessageCheck.toISOString())
-          .order('sent_at', { ascending: false });
+          .gt('sent_at', lastMessageCheck.toISOString())
+          .order('sent_at', { ascending: true });
 
         if (error) throw error;
+
+        console.log(`📊 Query result: ${newMessages?.length || 0} messages found`);
+        if (newMessages && newMessages.length > 0) {
+          console.log('📨 New messages details:', newMessages.map(m => ({
+            id: m.message_id,
+            from: `${m.sender.first_name} ${m.sender.last_name}`,
+            sent_at: m.sent_at,
+            content: m.content.substring(0, 50) + '...'
+          })));
+        }
 
         if (newMessages && newMessages.length > 0) {
           console.log(`📨 Found ${newMessages.length} new message(s)`);
           
-          // Show notifications for new messages
+          // Show notifications for new messages using actual database timestamps
           newMessages.forEach(message => {
+            console.log(`🔔 Processing notification for message sent at: ${message.sent_at}`);
             showLiveChatNotification(message);
           });
           
@@ -4581,9 +4652,16 @@
           if (currentConversation && newMessages.some(msg => msg.sender.user_id === currentConversation.otherUserId)) {
             await loadConversationMessages(currentConversation.otherUserId);
           }
+          
+          // Update last check time to the latest message timestamp from database
+          // Use the last message in the array since we ordered by ascending
+          const latestMessage = newMessages[newMessages.length - 1];
+          const latestMessageTime = new Date(latestMessage.sent_at);
+          lastMessageCheck = latestMessageTime;
+          console.log(`🕒 Updated lastMessageCheck to: ${lastMessageCheck.toISOString()} (from message: ${latestMessage.message_id})`);
+        } else {
+          console.log('📭 No new messages found');
         }
-        
-        lastMessageCheck = new Date();
         
       } catch (error) {
         console.error('Error checking for new messages:', error);
@@ -4592,6 +4670,12 @@
 
     function showLiveChatNotification(message) {
       const senderName = `${message.sender.first_name} ${message.sender.last_name}`;
+      
+      // Use actual timestamp from database - ensure proper parsing
+      const messageTime = new Date(message.sent_at);
+      const timeAgo = getTimeAgo(messageTime);
+      
+      console.log(`🔔 Showing notification for message sent at: ${message.sent_at} (${timeAgo})`);
       
       // Create notification toast
       const notification = document.createElement('div');
@@ -4617,7 +4701,7 @@
           <div style="font-size: 24px;">💬</div>
           <div>
             <div style="font-weight: 700; font-size: 16px;">${senderName}</div>
-            <div style="font-size: 12px; opacity: 0.8;">${message.sender.role} • Just now</div>
+            <div style="font-size: 12px; opacity: 0.8;">${message.sender.role} • ${timeAgo}</div>
           </div>
           <button onclick="this.closest('div').remove()" style="margin-left: auto; background: none; border: none; font-size: 18px; color: #8B4513; cursor: pointer; opacity: 0.7; padding: 4px;">&times;</button>
         </div>
@@ -4938,10 +5022,20 @@
           ({ name, lastMessage, timestamp, unread, avatar } = conv);
           userId = conv.id;
         } else {
-          // Database conversation data
+          // Database conversation data - use actual timestamp from database
           name = `${conv.otherUser.first_name} ${conv.otherUser.last_name}`;
           lastMessage = conv.lastMessage.content || 'No messages yet';
-          timestamp = new Date(conv.lastMessage.sent_at);
+          
+          // Parse the actual sent_at timestamp from database - ensure proper handling
+          const rawTimestamp = conv.lastMessage.sent_at;
+          timestamp = rawTimestamp ? new Date(rawTimestamp) : new Date();
+          
+          // Validate the parsed timestamp
+          if (isNaN(timestamp.getTime())) {
+            console.warn(`⚠️ Invalid timestamp for conversation with ${name}: ${rawTimestamp}`);
+            timestamp = new Date(); // Fallback to current time
+          }
+          
           unread = conv.unreadCount > 0;
           userId = conv.otherUser.user_id;
           
@@ -4952,8 +5046,11 @@
             'Tenant': '👤'
           };
           avatar = roleIcons[conv.otherUser.role] || '👤';
+          
+          console.log(`💬 Conversation with ${name}: raw_timestamp=${rawTimestamp}, parsed=${timestamp.toISOString()}, valid=${!isNaN(timestamp.getTime())}`);
         }
 
+        // Use the actual timestamp from database for time ago calculation
         const timeAgo = getTimeAgo(timestamp);
         
         return `
@@ -5237,7 +5334,23 @@
       const container = document.getElementById('chat-messages');
       
       container.innerHTML = messages.map(msg => {
-        const timeStr = msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        // Use the actual timestamp from database, handle both Date objects and ISO strings
+        let messageTime;
+        if (msg.timestamp instanceof Date) {
+          messageTime = msg.timestamp;
+        } else {
+          messageTime = new Date(msg.timestamp);
+        }
+        
+        // Validate the parsed timestamp
+        if (isNaN(messageTime.getTime())) {
+          console.warn(`⚠️ Invalid message timestamp: ${msg.timestamp} for message from ${msg.sender}`);
+          messageTime = new Date(); // Fallback to current time
+        }
+        
+        const timeStr = messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        console.log(`💬 Message display: sender=${msg.sender}, raw_timestamp=${msg.timestamp}, parsed=${messageTime.toISOString()}, timeStr=${timeStr}`);
         
         return `
           <div style="margin-bottom: 15px; display: flex; ${msg.isOwn ? 'justify-content: flex-end;' : 'justify-content: flex-start;'}">
@@ -5275,6 +5388,7 @@
           
         } else if (currentConversation) {
           // Send via direct Supabase with live notifications
+          const currentTimestamp = new Date().toISOString();
           const { data, error } = await supabase
             .from('messages')
             .insert([{
@@ -5282,7 +5396,7 @@
               receiver_id: currentConversation.otherUserId,
               content: messageText,
               is_read: false,
-              sent_at: new Date().toISOString()
+              sent_at: currentTimestamp
             }])
             .select(`
               *,
@@ -5295,9 +5409,10 @@
 
           console.log('✅ Message sent successfully:', data);
 
-          // Immediately add message to UI for instant feedback
+          // Immediately add message to UI for instant feedback using actual database timestamp
           const container = document.getElementById('chat-messages');
-          const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const messageTimestamp = data ? new Date(data.sent_at) : new Date(currentTimestamp);
+          const timeStr = messageTimestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           
           const messageDiv = document.createElement('div');
           messageDiv.style.cssText = 'margin-bottom: 15px; display: flex; justify-content: flex-end;';
@@ -5515,6 +5630,7 @@
           
         } else {
           // Send via Supabase with notifications
+          const currentTimestamp = new Date().toISOString();
           const { data, error } = await supabase
             .from('messages')
             .insert([{
@@ -5522,7 +5638,7 @@
               receiver_id: selectedRecipient.userId,
               content: initialMessage,
               is_read: false,
-              sent_at: new Date().toISOString()
+              sent_at: currentTimestamp
             }])
             .select(`
               *,
@@ -6204,5 +6320,5 @@
     checkAuthState();
     loadProperties();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99e69f27a373bc39',t:'MTc2MzEyNDQ5MS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99e84afaa19cbc39',t:'MTc2MzE0MjAxNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
