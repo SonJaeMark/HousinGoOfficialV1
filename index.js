@@ -1,437 +1,797 @@
-
+/** 
+ * @brief Supabase project URL.
+ * @details Base URL used to connect to your Supabase backend.
+ */
 const SUPABASE_URL = "https://myeqpxnpyurmxqtovdec.supabase.co";
+
+/**
+ * @brief Supabase public anonymous API key.
+ * @warning This key should be stored in environment variables in production.
+ */
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15ZXFweG5weXVybXhxdG92ZGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI1MzA0MzgsImV4cCI6MjA3ODEwNjQzOH0.X5aSsAzjvHvaaiOjM9f_M7gajFOpobn3IX623WFUzBA";
 
+/**
+ * @brief Creates a Supabase client instance.
+ * @details Used for all database queries and authentication actions.
+ */
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// GetStream + Supabase Messaging Configuration
+
+// ============================================================================
+// GetStream + Supabase Messaging Configuration Variables
+// ============================================================================
+
+/**
+ * @brief Active Stream Chat client instance.
+ * @details Starts as null and is initialized upon user login.
+ */
 let streamClient = null;
+
+/**
+ * @brief Stores the currently opened chat channel.
+ */
 let currentChannel = null;
+
+/**
+ * @brief List of conversations the logged-in user is part of.
+ * @details Used for chat sidebar display.
+ */
 let userConversations = [];
+
+/**
+ * @brief Holds the selected user for starting a new chat.
+ */
 let selectedRecipient = null;
+
+/**
+ * @brief Tracks if Stream Chat is connected.
+ * @details Prevents duplicate initialization.
+ */
 let isStreamConnected = false;
+
+/**
+ * @brief Interval ID for polling messages.
+ * @details Used only when fallback (manual polling) is active.
+ */
 let messagePollingInterval = null;
+
+/**
+ * @brief Tracks the last timestamp when messages were checked.
+ */
 let lastMessageCheck = new Date();
 
+
+// ============================================================================
+// Default UI / Branding Configuration
+// ============================================================================
+
+/**
+ * @brief Global site configuration.
+ * @details Controls theme, colors, and branding text across the website.
+ */
 const defaultConfig = {
-    site_name: "HousinGo",
-    tagline: "Your next home is just a click away.",
-    footer_text: "© 2025 HousinGo | All Rights Reserved",
-    contact_email: "support@housingo.ph",
-    primary_color: "#ADD8E6",
-    text_color: "#8B4513",
-    background_color: "#F5F5DC",
-    accent_color: "#87CEEB",
-    secondary_text_color: "#654321"
+    site_name: "HousinGo",               ///< Website name
+    tagline: "Your next home is just a click away.", ///< Site subtitle displayed in hero section
+    footer_text: "© 2025 HousinGo | All Rights Reserved", ///< Footer legal text
+    contact_email: "support@housingo.ph", ///< Support or business email
+
+    // Theme colors
+    primary_color: "#ADD8E6",            ///< Main brand color
+    text_color: "#8B4513",               ///< Primary text color
+    background_color: "#F5F5DC",         ///< Website background color
+    accent_color: "#87CEEB",             ///< Accent color for buttons and highlights
+    secondary_text_color: "#654321"      ///< Slightly darker text tone
 };
 
+
+// ============================================================================
+// Cached Data Stores
+// ============================================================================
+
+/**
+ * @brief Cached list of all properties loaded from Supabase.
+ */
 let allProperties = [];
+
+/**
+ * @brief Cached list of amenities associated with properties.
+ */
 let allAmenities = [];
+
+/**
+ * @brief Cached list of image records for all properties.
+ */
 let allImages = [];
 
+
+// ============================================================================
+// Amenity Icons
+// ============================================================================
+
+/**
+ * @brief Mapping of amenity names to icon emojis.
+ * @details Used for UI display in property cards & property details.
+ */
 const amenityIcons = {
-    'Wi-Fi': '📶',
-    'Aircon': '❄️',
-    'Water Included': '💧',
-    'Electric Included': '⚡',
-    'Kitchen Access': '🍳',
-    'Parking': '🚗',
-    'Private Bathroom': '🚿',
-    'Pet Friendly': '🐾'
+    'Wi-Fi': '📶',                ///< Wireless internet
+    'Aircon': '❄️',              ///< Air conditioning
+    'Water Included': '💧',      ///< Water utilities included
+    'Electric Included': '⚡',    ///< Electricity utilities included
+    'Kitchen Access': '🍳',      ///< Tenants may use the kitchen
+    'Parking': '🚗',             ///< Parking available
+    'Private Bathroom': '🚿',    ///< Bathroom included inside the room
+    'Pet Friendly': '🐾'         ///< Pets are allowed
 };
 
+/**
+ * @brief Loads properties, amenities, and images from Supabase.
+ * 
+ * @details 
+ * This function:
+ * - Shows a loading indicator
+ * - Fetches all approved + available properties
+ * - Fetches all amenities
+ * - Fetches all property images
+ * - Updates global caches (allProperties, allAmenities, allImages)
+ * - Calls displayProperties() to render them
+ * - Shows empty state if no properties exist
+ *
+ * @async
+ * @function loadProperties
+ * @returns {Promise<void>} Resolves when all UI updates and data fetching are complete.
+ */
 async function loadProperties() {
     try {
-    const loadingEl = document.getElementById('loading');
-    const containerEl = document.getElementById('properties-container');
-    const emptyStateEl = document.getElementById('empty-state');
+        // UI Element references
+        const loadingEl = document.getElementById('loading');          ///< Loading spinner/section
+        const containerEl = document.getElementById('properties-container'); ///< Main grid container for properties
+        const emptyStateEl = document.getElementById('empty-state');   ///< Shown when no properties exist
 
-    loadingEl.style.display = 'block';
-    containerEl.style.display = 'none';
-    emptyStateEl.style.display = 'none';
+        // Initial UI state: show loading, hide others
+        loadingEl.style.display = 'block';
+        containerEl.style.display = 'none';
+        emptyStateEl.style.display = 'none';
 
-    const { data: properties, error: propError } = await supabase
-        .from('properties')
-        .select(`
-        *,
-        landlord:users(
-            user_id,
-            first_name,
-            last_name,
-            email,
-            mobile
-        )
-        `)
-        .eq('availability', 'Available')
-        .eq('status', 'Approved')
-        .order('created_at', { ascending: false });
+        /**
+         * @brief Fetch all approved + available properties.
+         * @details Includes landlord basic profile using Supabase relational select.
+         */
+        const { data: properties, error: propError } = await supabase
+            .from('properties')
+            .select(`
+                *,
+                landlord:users(
+                    user_id,
+                    first_name,
+                    last_name,
+                    email,
+                    mobile
+                )
+            `)
+            .eq('availability', 'Available')
+            .eq('status', 'Approved')
+            .order('created_at', { ascending: false });
 
-    if (propError) {
-        console.error('Properties error:', propError);
-        throw propError;
-    }
+        if (propError) {
+            console.error('Properties error:', propError);
+            throw propError;
+        }
 
-    const { data: amenities, error: amenError } = await supabase
-        .from('amenities')
-        .select('*');
+        /**
+         * @brief Fetch all amenities for all properties.
+         */
+        const { data: amenities, error: amenError } = await supabase
+            .from('amenities')
+            .select('*');
 
-    if (amenError) {
-        console.error('Amenities error:', amenError);
-        throw amenError;
-    }
+        if (amenError) {
+            console.error('Amenities error:', amenError);
+            throw amenError;
+        }
 
-    const { data: images, error: imgError } = await supabase
-        .from('property_images')
-        .select('*');
+        /**
+         * @brief Fetch all images for all properties.
+         */
+        const { data: images, error: imgError } = await supabase
+            .from('property_images')
+            .select('*');
 
-    if (imgError) {
-        console.error('Images error:', imgError);
-        throw imgError;
-    }
+        if (imgError) {
+            console.error('Images error:', imgError);
+            throw imgError;
+        }
 
-    allProperties = properties || [];
-    allAmenities = amenities || [];
-    allImages = images || [];
+        // Update cached global arrays
+        allProperties = properties || [];
+        allAmenities = amenities || [];
+        allImages = images || [];
 
-    displayProperties(allProperties);
+        // Render properties to UI
+        displayProperties(allProperties);
 
-    loadingEl.style.display = 'none';
-    
-    if (allProperties.length === 0) {
-        emptyStateEl.style.display = 'block';
-    } else {
-        containerEl.style.display = 'grid';
-    }
+        // Hide loading section
+        loadingEl.style.display = 'none';
+
+        // Show empty state or property grid
+        if (allProperties.length === 0) {
+            emptyStateEl.style.display = 'block';
+        } else {
+            containerEl.style.display = 'grid';
+        }
+
     } catch (error) {
-    console.error('Error loading properties:', error);
-    document.getElementById('loading').innerHTML = '<p>Error loading properties. Please refresh the page.</p>';
+        console.error('Error loading properties:', error);
+
+        // Show visible error message to user
+        document.getElementById('loading').innerHTML =
+            '<p>Error loading properties. Please refresh the page.</p>';
     }
 }
 
+
+/**
+ * @brief Retrieves a list of included amenities for a given property.
+ *
+ * @function getPropertyAmenities
+ * @param {string} propertyId - UUID of the property.
+ * @returns {Array<string>} A list of amenity names enabled for that property.
+ *
+ * @details
+ * This checks the globally cached `allAmenities` array and returns only:
+ * - amenities where `property_id` matches
+ * - amenities where `is_included` is true
+ */
 function getPropertyAmenities(propertyId) {
     return allAmenities
-    .filter(a => a.property_id === propertyId && a.is_included)
-    .map(a => a.amenity_name);
+        .filter(a => a.property_id === propertyId && a.is_included)  // Keep only included amenities for this property
+        .map(a => a.amenity_name); // Return names only
 }
 
+/**
+ * @brief Retrieves all image records for a property.
+ *
+ * @function getPropertyImages
+ * @param {string} propertyId - UUID of the property.
+ * @returns {Array<Object>} Array of image objects from `property_images` table.
+ */
 function getPropertyImages(propertyId) {
-    return allImages.filter(img => img.property_id === propertyId);
+    return allImages.filter(img => img.property_id === propertyId); // Match property_id
 }
 
+/**
+ * @brief Displays property cards on the page, supports homepage mode.
+ *
+ * @function displayProperties
+ * @param {Array<Object>} properties - The list of property objects to display.
+ * @param {boolean} [isHomePage=true] - If true, only show 6 random properties.
+ *
+ * @details
+ * - Shows empty state if no properties exist.
+ * - Builds each property card with:
+ *   - image carousel (hover-based)
+ *   - amenities
+ *   - address, type, price
+ *   - action buttons (View, Message)
+ * - Uses `getPropertyAmenities()` and `getPropertyImages()` for data lookup.
+ */
 function displayProperties(properties, isHomePage = true) {
     const container = document.getElementById('properties-container');
     const emptyState = document.getElementById('empty-state');
-    
-    container.innerHTML = '';
 
+    container.innerHTML = ''; // Clear existing cards
+
+    // If no properties found, show empty state
     if (properties.length === 0) {
-    container.style.display = 'none';
-    emptyState.style.display = 'block';
-    return;
+        container.style.display = 'none';
+        emptyState.style.display = 'block';
+        return;
     }
 
     container.style.display = 'grid';
     emptyState.style.display = 'none';
 
-    // For home page, show only 6 random properties
+    // If on homepage, show only 6 random properties
     let displayProperties = properties;
     if (isHomePage) {
-    // Shuffle array and take first 6
-    const shuffled = [...properties].sort(() => 0.5 - Math.random());
-    displayProperties = shuffled.slice(0, 6);
+        const shuffled = [...properties].sort(() => 0.5 - Math.random()); // Shuffle list randomly
+        displayProperties = shuffled.slice(0, 6); // Show first 6
     }
 
     displayProperties.forEach(property => {
-    const amenities = getPropertyAmenities(property.property_id);
-    const images = getPropertyImages(property.property_id);
+        const amenities = getPropertyAmenities(property.property_id);  // Fetch amenities
+        const images = getPropertyImages(property.property_id);        // Fetch images
 
-    const card = document.createElement('div');
-    card.className = 'property-card';
-    card.onclick = () => showPropertyDetails(property);
+        // Create property card
+        const card = document.createElement('div');
+        card.className = 'property-card';
+        card.onclick = () => showPropertyDetails(property); // Clicking card opens details modal
 
-    const amenitiesHTML = amenities.slice(0, 4).map(amenity => {
-        const icon = amenityIcons[amenity] || '✓';
-        return `<span class="amenity-tag">${icon} ${amenity}</span>`;
-    }).join('');
+        // Create amenities preview (max 4)
+        const amenitiesHTML = amenities.slice(0, 4).map(amenity => {
+            const icon = amenityIcons[amenity] || '✓';
+            return `<span class="amenity-tag">${icon} ${amenity}</span>`;
+        }).join('');
 
-    // Create image carousel for property card
-    let imageHTML;
-    if (images.length > 0) {
-        imageHTML = `
-        <div class="property-image-carousel" style="position: relative; width: 100%; height: 250px; overflow: hidden;">
-            ${images.map((img, index) => `
-            <img src="${img.image_url}" alt="${property.type}" 
-                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: ${index === 0 ? 1 : 0}; transition: opacity 0.5s ease-in-out;"
-                    data-image-index="${index}">
-            `).join('')}
-            ${images.length > 1 ? `
-            <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 600;">
-                <span class="current-image">1</span>/${images.length}
+        // Create the property main image or carousel
+        let imageHTML;
+        if (images.length > 0) {
+            // Build carousel of images with fade transitions
+            imageHTML = `
+                <div class="property-image-carousel" 
+                    style="position: relative; width: 100%; height: 250px; overflow: hidden;">
+                    
+                    ${images.map((img, index) => `
+                        <img src="${img.image_url}" alt="${property.type}"
+                            style="
+                                position: absolute; 
+                                top: 0; left: 0; 
+                                width: 100%; height: 100%; 
+                                object-fit: cover; 
+                                opacity: ${index === 0 ? 1 : 0};
+                                transition: opacity 0.5s ease-in-out;
+                            "
+                            data-image-index="${index}">
+                    `).join('')}
+
+                    <!-- Show "1/3" label if multiple images -->
+                    ${images.length > 1 ? `
+                        <div style="
+                            position: absolute; bottom: 10px; right: 10px;
+                            background: rgba(0,0,0,0.7);
+                            color: white; padding: 4px 8px;
+                            border-radius: 12px;
+                            font-size: 12px; font-weight: 600;">
+                            <span class="current-image">1</span>/${images.length}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            // Fallback icon
+            imageHTML = '<div class="property-image">🏠</div>';
+        }
+
+        // Set complete card HTML
+        card.innerHTML = `
+            ${imageHTML}
+            <div class="property-content">
+                <span class="property-type">${property.type || 'Property'}</span>
+                <h3 class="property-title">${property.property_name || property.type || 'Property'}</h3>
+                <p class="property-location">📍 ${property.address || 'Address not specified'}</p>
+                <p class="property-price">₱${(property.monthly_rent || 0).toLocaleString()}/month</p>
+
+                <div class="amenities-list">
+                    ${amenitiesHTML}
+                    ${amenities.length > 4 ? `<span class="amenity-tag">+${amenities.length - 4} more</span>` : ''}
+                </div>
+
+                <div class="property-actions">
+                    <button class="btn-secondary" 
+                        onclick="event.stopPropagation(); viewDetails('${property.property_id}')">
+                        View
+                    </button>
+                    <button class="btn-secondary" 
+                        onclick="event.stopPropagation(); messageLandlordFromCard('${property.property_id}')">
+                        Message
+                    </button>
+                </div>
             </div>
-            ` : ''}
-        </div>
         `;
-    } else {
-        imageHTML = '<div class="property-image">🏠</div>';
-    }
 
-    card.innerHTML = `
-        ${imageHTML}
-        <div class="property-content">
-        <span class="property-type">${property.type || 'Property'}</span>
-        <h3 class="property-title">${property.property_name || property.type || 'Property'}</h3>
-        <p class="property-location">📍 ${property.address || 'Address not specified'}</p>
-        <p class="property-price">₱${(property.monthly_rent || 0).toLocaleString()}/month</p>
-        <div class="amenities-list">
-            ${amenitiesHTML}
-            ${amenities.length > 4 ? `<span class="amenity-tag">+${amenities.length - 4} more</span>` : ''}
-        </div>
-        <div class="property-actions">
-            <button class="btn-secondary" onclick="event.stopPropagation(); viewDetails('${property.property_id}')">View</button>
-            <button class="btn-secondary" onclick="event.stopPropagation(); messageLandlordFromCard('${property.property_id}')">Message</button>
-        </div>
-        </div>
-    `;
+        // ---------------------------
+        // Add hover-based image carousel
+        // ---------------------------
+        if (images.length > 1) {
+            let carouselInterval;
+            let currentImageIndex = 0;
 
-    // Add hover carousel functionality for property cards
-    if (images.length > 1) {
-        let carouselInterval;
-        let currentImageIndex = 0;
-        const carouselImages = card.querySelectorAll('.property-image-carousel img');
-        const currentImageSpan = card.querySelector('.current-image');
+            const carouselImages = card.querySelectorAll('.property-image-carousel img');
+            const currentImageSpan = card.querySelector('.current-image');
 
-        function nextImage() {
-        carouselImages[currentImageIndex].style.opacity = '0';
-        currentImageIndex = (currentImageIndex + 1) % images.length;
-        carouselImages[currentImageIndex].style.opacity = '1';
-        if (currentImageSpan) {
-            currentImageSpan.textContent = currentImageIndex + 1;
+            /**
+             * @brief Switches to the next image in the card carousel.
+             */
+            function nextImage() {
+                carouselImages[currentImageIndex].style.opacity = '0'; // Hide current
+                currentImageIndex = (currentImageIndex + 1) % images.length; // Move forward
+                carouselImages[currentImageIndex].style.opacity = '1'; // Show next
+
+                if (currentImageSpan) {
+                    currentImageSpan.textContent = currentImageIndex + 1; // Update "1/4"
+                }
+            }
+
+            // Start carousel on hover
+            card.addEventListener('mouseenter', () => {
+                carouselInterval = setInterval(nextImage, 2000);
+            });
+
+            // Stop carousel when mouse leaves
+            card.addEventListener('mouseleave', () => {
+                if (carouselInterval) {
+                    clearInterval(carouselInterval);
+                    carouselInterval = null;
+                }
+            });
         }
-        }
 
-        card.addEventListener('mouseenter', () => {
-        carouselInterval = setInterval(nextImage, 2000);
-        });
-
-        card.addEventListener('mouseleave', () => {
-        if (carouselInterval) {
-            clearInterval(carouselInterval);
-            carouselInterval = null;
-        }
-        });
-    }
-
-    container.appendChild(card);
+        // Append card to container
+        container.appendChild(card);
     });
 }
 
+
+/**
+ * @brief Opens the property details modal and displays full information.
+ *
+ * @function showPropertyDetails
+ * @param {Object} property - The complete property object selected by the user.
+ *
+ * @details
+ * This function:
+ * - Builds a modal with dynamic HTML
+ * - Generates a full image carousel (if multiple images)
+ * - Displays property info, location, amenities, rules, and contact details
+ * - Includes an application textarea + Apply button
+ * - Starts auto–carousel when multiple images exist
+ */
 function showPropertyDetails(property) {
+
+    // Get modal elements
     const modal = document.getElementById('property-modal');
     const modalBody = document.getElementById('modal-body');
+
+    // Fetch amenity list & images for this property
     const amenities = getPropertyAmenities(property.property_id);
     const images = getPropertyImages(property.property_id);
 
-    const amenitiesHTML = amenities.map(amenity => {
-    const icon = amenityIcons[amenity] || '✓';
-    return `<div class="amenity-item">${icon} ${amenity}</div>`;
-    }).join('');
+    /**
+     * Build the list of amenities with icons
+     */
+    const amenitiesHTML = amenities
+        .map(amenity => {
+            const icon = amenityIcons[amenity] || '✓';
+            return `<div class="amenity-item">${icon} ${amenity}</div>`;
+        })
+        .join('');
 
-    const imagesHTML = images.length > 0 
-    ? images.map(img => `<img src="${img.image_url}" alt="Property" style="width: 100%; border-radius: 8px; margin-bottom: 15px;">`).join('')
-    : '<div class="property-image" style="height: 300px; font-size: 100px;">🏠</div>';
+    /**
+     * Build fallback or static single-image display
+     */
+    const imagesHTML =
+        images.length > 0
+            ? images
+                  .map(
+                      img =>
+                          `<img src="${img.image_url}" alt="Property" style="width:100%; border-radius:8px; margin-bottom:15px;">`
+                  )
+                  .join('')
+            : '<div class="property-image" style="height:300px; font-size:100px;">🏠</div>';
 
+    // Build full modal content HTML
     modalBody.innerHTML = `
-    <div class="detail-section">
-        ${images.length > 1 ? `
-        <div style="position: relative; width: 100%; margin-bottom: 15px;">
-            <div class="modal-image-carousel" style="position: relative; width: 100%; height: 400px; overflow: hidden; border-radius: 8px;">
-            ${images.map((img, index) => `
-                <img src="${img.image_url}" alt="Property" 
-                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: ${index === 0 ? 1 : 0}; transition: opacity 0.5s ease-in-out;"
-                    data-modal-image-index="${index}">
-            `).join('')}
-            <div style="position: absolute; bottom: 15px; right: 15px; background: rgba(0,0,0,0.8); color: white; padding: 8px 12px; border-radius: 20px; font-size: 14px; font-weight: 600;">
-                <span class="modal-current-image">1</span>/${images.length}
+        <div class="detail-section">
+            ${
+                images.length > 1
+                    ? `
+            <!-- CAROUSEL block -->
+            <div style="position:relative; width:100%; margin-bottom:15px;">
+                <div class="modal-image-carousel" 
+                     style="position:relative; width:100%; height:400px; overflow:hidden; border-radius:8px;">
+
+                    ${images
+                        .map(
+                            (img, index) => `
+                        <img src="${img.image_url}" alt="Property"
+                            style="
+                                position:absolute; top:0; left:0;
+                                width:100%; height:100%;
+                                object-fit:cover;
+                                opacity:${index === 0 ? 1 : 0};
+                                transition: opacity 0.5s ease-in-out;
+                            "
+                            data-modal-image-index="${index}"
+                        >
+                    `
+                        )
+                        .join('')}
+
+                    <!-- Counter -->
+                    <div style="
+                        position:absolute; bottom:15px; right:15px;
+                        background:rgba(0,0,0,0.8);
+                        color:white; padding:8px 12px;
+                        border-radius:20px; font-size:14px;
+                        font-weight:600;">
+                        <span class="modal-current-image">1</span>/${images.length}
+                    </div>
+
+                    <!-- Nav buttons -->
+                    <button onclick="prevModalImage()" 
+                        style="position:absolute; left:15px; top:50%; transform:translateY(-50%);
+                               background:rgba(0,0,0,0.6); color:white; border:none;
+                               padding:12px 16px; border-radius:50%; cursor:pointer;
+                               font-size:18px; font-weight:bold;">‹</button>
+
+                    <button onclick="nextModalImage()" 
+                        style="position:absolute; right:15px; top:50%; transform:translateY(-50%);
+                               background:rgba(0,0,0,0.6); color:white; border:none;
+                               padding:12px 16px; border-radius:50%; cursor:pointer;
+                               font-size:18px; font-weight:bold;">›</button>
+                </div>
+            </div>`
+                    : imagesHTML
+            }
+        </div>
+
+        <!-- PROPERTY INFORMATION -->
+        <div class="detail-section">
+            <h3>Property Information</h3>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <div class="detail-label">Property Name</div>
+                    <div class="detail-value">${property.property_name || 'N/A'}</div>
+                </div>
+
+                <div class="detail-item">
+                    <div class="detail-label">Type</div>
+                    <div class="detail-value">${property.type || 'N/A'}</div>
+                </div>
+
+                <div class="detail-item">
+                    <div class="detail-label">Monthly Rent</div>
+                    <div class="detail-value">₱${(property.monthly_rent || 0).toLocaleString()}</div>
+                </div>
+
+                <div class="detail-item">
+                    <div class="detail-label">Available Slots</div>
+                    <div class="detail-value">${property.available_slots || 'N/A'}</div>
+                </div>
+
+                <div class="detail-item">
+                    <div class="detail-label">Minimum Stay</div>
+                    <div class="detail-value">${property.min_stay || 'N/A'}</div>
+                </div>
             </div>
-            <button onclick="prevModalImage()" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; padding: 12px 16px; border-radius: 50%; cursor: pointer; font-size: 18px; font-weight: bold;">‹</button>
-            <button onclick="nextModalImage()" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.6); color: white; border: none; padding: 12px 16px; border-radius: 50%; cursor: pointer; font-size: 18px; font-weight: bold;">›</button>
+        </div>
+
+        <!-- LOCATION -->
+        <div class="detail-section">
+            <h3>Location</h3>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <div class="detail-label">Address</div>
+                    <div class="detail-value">${property.address || 'N/A'}</div>
+                </div>
+
+                <div class="detail-item">
+                    <div class="detail-label">Barangay</div>
+                    <div class="detail-value">${property.barangay || 'N/A'}</div>
+                </div>
+
+                <div class="detail-item">
+                    <div class="detail-label">City</div>
+                    <div class="detail-value">${property.city || 'N/A'}</div>
+                </div>
+
+                <div class="detail-item">
+                    <div class="detail-label">Nearby Landmarks</div>
+                    <div class="detail-value">${property.nearby_landmarks || 'N/A'}</div>
+                </div>
+
+                ${
+                    property.loc_link
+                        ? `
+                <div class="detail-item">
+                    <div class="detail-label">Location on Map</div>
+                    <div class="detail-value">
+                        <a href="${property.loc_link}" 
+                           target="_blank" 
+                           rel="noopener noreferrer"
+                           style="
+                              color:#ADD8E6; text-decoration:none; 
+                              font-weight:600; display:inline-flex; 
+                              align-items:center; gap:8px; padding:10px 16px;
+                              background-color:#F5F5DC; border-radius:8px;
+                              border:2px solid #ADD8E6; transition:all 0.3s;
+                              cursor:pointer; font-size:14px;"
+                           onmouseover="this.style.backgroundColor='#ADD8E6'; this.style.color='#8B4513'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';"
+                           onmouseout="this.style.backgroundColor='#F5F5DC'; this.style.color='#ADD8E6'; this.style.transform='translateY(0)'; this.style.boxShadow='none';"
+                        >
+                            📍 View on Google Maps
+                        </a>
+                    </div>
+                </div>`
+                        : ''
+                }
             </div>
         </div>
-        ` : imagesHTML}
-    </div>
 
-    <div class="detail-section">
-        <h3>Property Information</h3>
-        <div class="detail-grid">
-        <div class="detail-item">
-            <div class="detail-label">Property Name</div>
-            <div class="detail-value">${property.property_name || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Type</div>
-            <div class="detail-value">${property.type || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Monthly Rent</div>
-            <div class="detail-value">₱${(property.monthly_rent || 0).toLocaleString()}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Available Slots</div>
-            <div class="detail-value">${property.available_slots || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Minimum Stay</div>
-            <div class="detail-value">${property.min_stay || 'N/A'}</div>
-        </div>
-        </div>
-    </div>
-
-    <div class="detail-section">
-        <h3>Location</h3>
-        <div class="detail-grid">
-        <div class="detail-item">
-            <div class="detail-label">Address</div>
-            <div class="detail-value">${property.address || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Barangay</div>
-            <div class="detail-value">${property.barangay || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">City</div>
-            <div class="detail-value">${property.city || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Nearby Landmarks</div>
-            <div class="detail-value">${property.nearby_landmarks || 'N/A'}</div>
-        </div>
-        ${property.loc_link ? `
-            <div class="detail-item">
-            <div class="detail-label">Location on Map</div>
-            <div class="detail-value">
-                <a href="${property.loc_link}" target="_blank" rel="noopener noreferrer" style="color: #ADD8E6; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; background-color: #F5F5DC; border-radius: 8px; border: 2px solid #ADD8E6; transition: all 0.3s; cursor: pointer; font-size: 14px;" onmouseover="this.style.backgroundColor='#ADD8E6'; this.style.color='#8B4513'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';" onmouseout="this.style.backgroundColor='#F5F5DC'; this.style.color='#ADD8E6'; this.style.transform='translateY(0)'; this.style.boxShadow='none';">
-                📍 View on Google Maps
-                </a>
+        <!-- AMENITIES -->
+        <div class="detail-section">
+            <h3>Amenities</h3>
+            <div class="amenities-grid">
+                ${amenitiesHTML || '<p>No amenities listed</p>'}
             </div>
+        </div>
+
+        <!-- DESCRIPTION -->
+        <div class="detail-section">
+            <h3>Description</h3>
+            <p>${property.description || 'No description available'}</p>
+        </div>
+
+        <!-- RULES -->
+        <div class="detail-section">
+            <h3>Rules</h3>
+            <p>${property.rules || 'No rules specified'}</p>
+        </div>
+
+        <!-- CONTACT -->
+        <div class="detail-section">
+            <h3>Contact Information</h3>
+            <div class="detail-grid">
+
+                <div class="detail-item">
+                    <div class="detail-label">Contact Name</div>
+                    <div class="detail-value">${property.contact_name || 'N/A'}</div>
+                </div>
+
+                <div class="detail-item">
+                    <div class="detail-label">Contact Number</div>
+                    <div class="detail-value">${property.contact_number || 'N/A'}</div>
+                </div>
+
+                <div class="detail-item">
+                    <div class="detail-label">Move-in Date</div>
+                    <div class="detail-value">${property.move_in_date || 'N/A'}</div>
+                </div>
             </div>
-        ` : ''}
         </div>
-    </div>
 
-    <div class="detail-section">
-        <h3>Amenities</h3>
-        <div class="amenities-grid">
-        ${amenitiesHTML || '<p>No amenities listed</p>'}
-        </div>
-    </div>
+        <!-- APPLICATION AREA -->
+        <div style="margin-top:20px;">
+            <label for="application-notes" 
+                   style="display:block; margin-bottom:8px; font-weight:600; color:#8B4513;">
+                Application Notes (Optional)
+            </label>
 
-    <div class="detail-section">
-        <h3>Description</h3>
-        <p>${property.description || 'No description available'}</p>
-    </div>
+            <textarea id="application-notes" rows="3"
+                placeholder="Tell the landlord about yourself..."
+                style="
+                    width:100%; padding:12px; border:2px solid #ADD8E6;
+                    border-radius:8px; font-size:16px; color:#8B4513;
+                    resize:vertical; margin-bottom:15px;">
+            </textarea>
 
-    <div class="detail-section">
-        <h3>Rules</h3>
-        <p>${property.rules || 'No rules specified'}</p>
-    </div>
-
-    <div class="detail-section">
-        <h3>Contact Information</h3>
-        <div class="detail-grid">
-        <div class="detail-item">
-            <div class="detail-label">Contact Name</div>
-            <div class="detail-value">${property.contact_name || 'N/A'}</div>
+            <button class="btn" style="width:100%;" 
+                onclick="applyForProperty('${property.property_id}')">
+                Apply for this Property
+            </button>
         </div>
-        <div class="detail-item">
-            <div class="detail-label">Contact Number</div>
-            <div class="detail-value">${property.contact_number || 'N/A'}</div>
-        </div>
-        <div class="detail-item">
-            <div class="detail-label">Move-in Date</div>
-            <div class="detail-value">${property.move_in_date || 'N/A'}</div>
-        </div>
-        </div>
-    </div>
-
-    <div style="margin-top: 20px;">
-        <label for="application-notes" style="display: block; margin-bottom: 8px; font-weight: 600; color: #8B4513;">Application Notes (Optional)</label>
-        <textarea id="application-notes" rows="3" placeholder="Tell the landlord about yourself, your move-in date, or any questions..." style="width: 100%; padding: 12px; border: 2px solid #ADD8E6; border-radius: 8px; font-size: 16px; color: #8B4513; resize: vertical; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin-bottom: 15px;"></textarea>
-        <button class="btn" style="width: 100%;" onclick="applyForProperty('${property.property_id}')">Apply for this Property</button>
-    </div>
     `;
 
+    // Show modal
     modal.classList.add('active');
 
-    // Start auto-carousel for modal if multiple images
-    if (images.length > 1) {
-    startModalCarousel();
-    }
+    // Start carousel if multiple images exist
+    if (images.length > 1) startModalCarousel();
 }
 
-let modalCarouselInterval;
-let modalCurrentImageIndex = 0;
 
+
+/** ============================
+ *  Modal Carousel Variables
+ *  ============================ */
+let modalCarouselInterval;       ///< Interval handler for auto-rotation
+let modalCurrentImageIndex = 0;  ///< Tracks which image is active
+
+
+
+/**
+ * @brief Starts automatic rotation of images inside the modal.
+ *
+ * @function startModalCarousel
+ * @details Fades images every 2 seconds with opacity transitions.
+ */
 function startModalCarousel() {
     const modalImages = document.querySelectorAll('.modal-image-carousel img');
     const modalCurrentSpan = document.querySelector('.modal-current-image');
-    
-    if (modalImages.length <= 1) return;
+
+    if (modalImages.length <= 1) return; // No carousel needed
 
     modalCarouselInterval = setInterval(() => {
-    modalImages[modalCurrentImageIndex].style.opacity = '0';
-    modalCurrentImageIndex = (modalCurrentImageIndex + 1) % modalImages.length;
-    modalImages[modalCurrentImageIndex].style.opacity = '1';
-    if (modalCurrentSpan) {
-        modalCurrentSpan.textContent = modalCurrentImageIndex + 1;
-    }
+        modalImages[modalCurrentImageIndex].style.opacity = '0'; // Hide current
+
+        modalCurrentImageIndex =
+            (modalCurrentImageIndex + 1) % modalImages.length; // Move forward
+
+        modalImages[modalCurrentImageIndex].style.opacity = '1'; // Show next
+
+        if (modalCurrentSpan) {
+            modalCurrentSpan.textContent = modalCurrentImageIndex + 1;
+        }
     }, 2000);
 }
 
+/**
+ * @brief Stops the modal image carousel.
+ *
+ * @function stopModalCarousel
+ */
 function stopModalCarousel() {
     if (modalCarouselInterval) {
-    clearInterval(modalCarouselInterval);
-    modalCarouselInterval = null;
+        clearInterval(modalCarouselInterval);
+        modalCarouselInterval = null;
     }
 }
 
+/**
+ * @brief Navigates to the next image manually.
+ *
+ * @function nextModalImage
+ * @details Stops auto-rotation, moves to next image, restarts auto-rotation.
+ */
 function nextModalImage() {
     const modalImages = document.querySelectorAll('.modal-image-carousel img');
     const modalCurrentSpan = document.querySelector('.modal-current-image');
-    
+
     if (modalImages.length <= 1) return;
 
     stopModalCarousel();
+
     modalImages[modalCurrentImageIndex].style.opacity = '0';
-    modalCurrentImageIndex = (modalCurrentImageIndex + 1) % modalImages.length;
+    modalCurrentImageIndex =
+        (modalCurrentImageIndex + 1) % modalImages.length;
     modalImages[modalCurrentImageIndex].style.opacity = '1';
+
     if (modalCurrentSpan) {
-    modalCurrentSpan.textContent = modalCurrentImageIndex + 1;
+        modalCurrentSpan.textContent = modalCurrentImageIndex + 1;
     }
+
     startModalCarousel();
 }
 
+/**
+ * @brief Navigates to the previous image manually.
+ *
+ * @function prevModalImage
+ * @details Stops auto-rotation, moves backward, restarts auto-rotation.
+ */
 function prevModalImage() {
     const modalImages = document.querySelectorAll('.modal-image-carousel img');
     const modalCurrentSpan = document.querySelector('.modal-current-image');
-    
+
     if (modalImages.length <= 1) return;
 
     stopModalCarousel();
+
     modalImages[modalCurrentImageIndex].style.opacity = '0';
-    modalCurrentImageIndex = modalCurrentImageIndex === 0 ? modalImages.length - 1 : modalCurrentImageIndex - 1;
+    modalCurrentImageIndex =
+        modalCurrentImageIndex === 0
+            ? modalImages.length - 1
+            : modalCurrentImageIndex - 1;
+
     modalImages[modalCurrentImageIndex].style.opacity = '1';
+
     if (modalCurrentSpan) {
-    modalCurrentSpan.textContent = modalCurrentImageIndex + 1;
+        modalCurrentSpan.textContent = modalCurrentImageIndex + 1;
     }
+
     startModalCarousel();
 }
 
+/**
+ * @brief Finds a property by ID and opens the details modal.
+ *
+ * @function viewDetails
+ * @param {string} propertyId - Unique property identifier.
+ */
 function viewDetails(propertyId) {
     const property = allProperties.find(p => p.property_id === propertyId);
-    if (property) {
-    showPropertyDetails(property);
-    }
+    if (property) showPropertyDetails(property);
 }
+
 
 function contactLandlord(propertyId) {
     const property = allProperties.find(p => p.property_id === propertyId);
