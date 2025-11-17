@@ -1,3 +1,4 @@
+
 const SUPABASE_URL = "https://myeqpxnpyurmxqtovdec.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15ZXFweG5weXVybXhxdG92ZGVjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI1MzA0MzgsImV4cCI6MjA3ODEwNjQzOH0.X5aSsAzjvHvaaiOjM9f_M7gajFOpobn3IX623WFUzBA";
 
@@ -304,6 +305,16 @@ function showPropertyDetails(property) {
             <div class="detail-label">Nearby Landmarks</div>
             <div class="detail-value">${property.nearby_landmarks || 'N/A'}</div>
         </div>
+        ${property.loc_link ? `
+            <div class="detail-item">
+            <div class="detail-label">Location on Map</div>
+            <div class="detail-value">
+                <a href="${property.loc_link}" target="_blank" rel="noopener noreferrer" style="color: #ADD8E6; text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; background-color: #F5F5DC; border-radius: 8px; border: 2px solid #ADD8E6; transition: all 0.3s; cursor: pointer; font-size: 14px;" onmouseover="this.style.backgroundColor='#ADD8E6'; this.style.color='#8B4513'; this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 8px rgba(0,0,0,0.1)';" onmouseout="this.style.backgroundColor='#F5F5DC'; this.style.color='#ADD8E6'; this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                📍 View on Google Maps
+                </a>
+            </div>
+            </div>
+        ` : ''}
         </div>
     </div>
 
@@ -580,6 +591,70 @@ async function applyForProperty(propertyId) {
 
 let selectedType = '';
 
+function performHeroSearch() {
+    // Get search values from hero section
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    const typeSearch = document.getElementById('type-search').value;
+    const priceSearch = document.getElementById('price-search').value;
+
+    // Navigate to browse properties page
+    showPage('browse-properties');
+
+    // Wait for page to load, then apply search filters
+    setTimeout(() => {
+    // Set the search values in browse properties page
+    const browseSearchInput = document.getElementById('browse-search-input');
+    const browseSortSelect = document.getElementById('browse-sort');
+    
+    if (browseSearchInput) {
+        browseSearchInput.value = document.getElementById('search-input').value;
+    }
+
+    // Set the property type filter if selected
+    if (typeSearch) {
+        selectedBrowseType = typeSearch;
+        
+        // Update filter button states
+        document.querySelectorAll('[data-browse-type]').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.backgroundColor = '#F5F5DC';
+        btn.style.borderColor = '#ADD8E6';
+        });
+        
+        const targetBtn = document.querySelector(`[data-browse-type="${typeSearch}"]`);
+        if (targetBtn) {
+        targetBtn.classList.add('active');
+        targetBtn.style.backgroundColor = '#ADD8E6';
+        targetBtn.style.borderColor = '#87CEEB';
+        }
+    }
+
+    // Apply the search filters
+    filterBrowseProperties();
+    
+    // Show success message
+    const totalResults = browseProperties.filter(property => {
+        const matchesSearch = !searchTerm || 
+        (property.property_name && property.property_name.toLowerCase().includes(searchTerm)) ||
+        (property.type && property.type.toLowerCase().includes(searchTerm)) ||
+        (property.city && property.city.toLowerCase().includes(searchTerm)) ||
+        (property.barangay && property.barangay.toLowerCase().includes(searchTerm)) ||
+        (property.address && property.address.toLowerCase().includes(searchTerm)) ||
+        (property.nearby_landmarks && property.nearby_landmarks.toLowerCase().includes(searchTerm)) ||
+        (property.description && property.description.toLowerCase().includes(searchTerm));
+
+        const matchesType = !typeSearch || property.type === typeSearch;
+        const matchesPrice = !priceSearch || property.monthly_rent <= parseInt(priceSearch);
+
+        return matchesSearch && matchesType && matchesPrice;
+    }).length;
+
+    if (searchTerm || typeSearch || priceSearch) {
+        showToast(`Found ${totalResults} properties matching your search criteria!`);
+    }
+    }, 300);
+}
+
 function filterProperties() {
     const searchTerm = document.getElementById('search-input').value.toLowerCase();
     const typeSearch = document.getElementById('type-search').value;
@@ -587,10 +662,12 @@ function filterProperties() {
 
     let filtered = allProperties.filter(property => {
     const matchesSearch = !searchTerm || 
+        (property.property_name && property.property_name.toLowerCase().includes(searchTerm)) ||
         (property.type && property.type.toLowerCase().includes(searchTerm)) ||
         (property.city && property.city.toLowerCase().includes(searchTerm)) ||
         (property.barangay && property.barangay.toLowerCase().includes(searchTerm)) ||
-        (property.address && property.address.toLowerCase().includes(searchTerm));
+        (property.address && property.address.toLowerCase().includes(searchTerm)) ||
+        (property.nearby_landmarks && property.nearby_landmarks.toLowerCase().includes(searchTerm));
 
     const matchesTypeSearch = !typeSearch || property.type === typeSearch;
     const matchesPriceSearch = !priceSearch || property.monthly_rent <= parseInt(priceSearch);
@@ -611,12 +688,14 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     });
 });
 
-document.getElementById('search-btn').addEventListener('click', filterProperties);
+document.getElementById('search-btn').addEventListener('click', performHeroSearch);
 document.getElementById('search-input').addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') filterProperties();
+    if (e.key === 'Enter') {
+    performHeroSearch();
+    }
 });
-document.getElementById('type-search').addEventListener('change', filterProperties);
-document.getElementById('price-search').addEventListener('change', filterProperties);
+document.getElementById('type-search').addEventListener('change', performHeroSearch);
+document.getElementById('price-search').addEventListener('change', performHeroSearch);
 
 document.getElementById('close-modal').addEventListener('click', () => {
     stopModalCarousel();
@@ -803,6 +882,8 @@ function showPage(pageName) {
     loadUserSettings();
     } else if (pageName === 'browse-properties') {
     loadBrowseProperties();
+    } else if (pageName === 'post-property') {
+    loadPostPropertyForm();
     }
 
     // Scroll to top
@@ -880,16 +961,17 @@ async function handlePostProperty(event) {
         .from('properties')
         .select('*')
         .eq('property_id', propertyId)
-        .eq('landlord_id', currentUser.user_id);
+        .eq('landlord_id', currentUser.user_id)
+        .single();
         
         console.log('✅ Existing property verification from DB:', fromDB);
         console.log('❌ Verification error:', checkError);
         
-        if (checkError || !fromDB || fromDB.length === 0) {
+        if (checkError || !fromDB) {
         throw new Error('Property not found or you do not have permission to edit it');
         }
         
-        const existingProperty = fromDB[0];
+        const existingProperty = fromDB;
         
         // 2️⃣ Prepare update data - keep existing status unless it was rejected
         const updateData = {
@@ -915,13 +997,14 @@ async function handlePostProperty(event) {
         
         console.log('📝 Update data mapped from form:', updateData);
         
-        // 3️⃣ Perform the update with proper ownership verification using correct Supabase syntax
+        // 3️⃣ Perform the update with proper UUID handling and ownership verification
         const { data, error } = await supabase
         .from('properties')
         .update(updateData)
         .eq('property_id', propertyId)
         .eq('landlord_id', currentUser.user_id)
-        .select();
+        .select()
+        .single();
 
         console.log('✅ Update response data:', data);
         console.log('❌ Update error:', error);
@@ -931,11 +1014,11 @@ async function handlePostProperty(event) {
         throw error;
         }
         
-        if (!data || data.length === 0) {
+        if (!data) {
         throw new Error('Property update failed - no data returned or permission denied');
         }
         
-        property = data[0];
+        property = data;
         console.log('✅ Property updated successfully!');
         console.log('Updated property:', property);
         
@@ -1062,12 +1145,25 @@ async function handlePostProperty(event) {
     
     setTimeout(() => {
         showPage('landlord-dashboard');
+        
+        // Reset form completely
         form.reset();
         form.dataset.editMode = 'false';
         form.dataset.propertyId = '';
+        
+        // Clear image preview
         document.getElementById('image-preview').innerHTML = '';
+        
+        // Clear file input
+        document.getElementById('property-images').value = '';
+        
+        // Uncheck all amenity checkboxes
+        document.querySelectorAll('input[name="amenity"]').forEach(cb => cb.checked = false);
+        
+        // Reset form UI
         document.querySelector('#post-property-page h1').textContent = 'Post New Property';
         submitBtn.textContent = 'Publish Property';
+        submitBtn.disabled = false;
     }, 2000);
 
     } catch (error) {
@@ -1280,10 +1376,15 @@ function displayPropertyManagement() {
     // Filter properties based on search and filters
     let filteredProperties = adminProperties.filter(prop => {
     const matchesSearch = !propertySearchTerm || 
-        prop.type.toLowerCase().includes(propertySearchTerm.toLowerCase()) ||
-        prop.city.toLowerCase().includes(propertySearchTerm.toLowerCase()) ||
-        prop.address.toLowerCase().includes(propertySearchTerm.toLowerCase()) ||
-        (prop.landlord.first_name + ' ' + prop.landlord.last_name).toLowerCase().includes(propertySearchTerm.toLowerCase());
+        (prop.property_name && prop.property_name.toLowerCase().includes(propertySearchTerm.toLowerCase())) ||
+        (prop.type && prop.type.toLowerCase().includes(propertySearchTerm.toLowerCase())) ||
+        (prop.city && prop.city.toLowerCase().includes(propertySearchTerm.toLowerCase())) ||
+        (prop.barangay && prop.barangay.toLowerCase().includes(propertySearchTerm.toLowerCase())) ||
+        (prop.address && prop.address.toLowerCase().includes(propertySearchTerm.toLowerCase())) ||
+        (prop.nearby_landmarks && prop.nearby_landmarks.toLowerCase().includes(propertySearchTerm.toLowerCase())) ||
+        (prop.description && prop.description.toLowerCase().includes(propertySearchTerm.toLowerCase())) ||
+        (prop.landlord && (prop.landlord.first_name + ' ' + prop.landlord.last_name).toLowerCase().includes(propertySearchTerm.toLowerCase())) ||
+        (prop.landlord && prop.landlord.email && prop.landlord.email.toLowerCase().includes(propertySearchTerm.toLowerCase()));
     
     const matchesType = !propertyTypeFilter || prop.type === propertyTypeFilter;
     const matchesStatus = !propertyStatusFilter || prop.status === propertyStatusFilter;
@@ -1687,7 +1788,7 @@ async function editProperty(propertyId) {
     console.log('Loading property data for edit:', propertyId);
     console.log('Current user:', currentUser);
     
-    // 1️⃣ Get first all data from database and store it to fromDB
+    // 1️⃣ Get property data from database with proper UUID handling
     const { data: fromDB, error: propError } = await supabase
         .from('properties')
         .select('*')
@@ -1706,12 +1807,11 @@ async function editProperty(propertyId) {
 
     console.log('✅ Property data loaded successfully from DB:', fromDB);
 
-    // 2️⃣ Get amenities for this property (only included ones)
+    // 2️⃣ Get amenities for this property
     const { data: amenities, error: amenError } = await supabase
         .from('amenities')
         .select('*')
-        .eq('property_id', propertyId)
-        .eq('is_included', true);
+        .eq('property_id', propertyId);
 
     if (amenError) {
         console.error('Amenities fetch error:', amenError);
@@ -1753,8 +1853,13 @@ async function editProperty(propertyId) {
         document.getElementById('location-link').value = fromDB.loc_link || '';
         document.getElementById('property-description').value = fromDB.description || '';
         document.getElementById('property-rules').value = fromDB.rules || '';
-        document.getElementById('contact-name').value = fromDB.contact_name || '';
-        document.getElementById('contact-number').value = fromDB.contact_number || '';
+        
+        // Auto-fill contact info from current landlord profile (always use current user data)
+        const contactName = `${currentUser.first_name} ${currentUser.last_name}`;
+        const contactNumber = currentUser.mobile || '';
+        document.getElementById('contact-name').value = contactName;
+        document.getElementById('contact-number').value = contactNumber;
+        
         document.getElementById('move-in-date').value = fromDB.move_in_date || '';
         document.getElementById('min-stay').value = fromDB.min_stay || '';
 
@@ -2047,6 +2152,81 @@ function contactApplicant(mobile, firstName) {
     </div>
     `;
     document.body.appendChild(contactModal);
+}
+
+// Load Post Property Form with auto-filled contact info
+async function loadPostPropertyForm() {
+    if (!currentUser || currentUser.role !== 'Landlord') {
+    showToast('Only landlords can post properties');
+    showPage('home');
+    return;
+    }
+
+    try {
+    // Get the latest landlord data from database to ensure we have current info
+    const { data: landlordData, error } = await supabase
+        .from('users')
+        .select('user_id, first_name, last_name, mobile')
+        .eq('user_id', currentUser.user_id)
+        .single();
+
+    if (error) {
+        console.error('Error fetching landlord data:', error);
+        // Fallback to stored user data
+        autoFillContactInfo(currentUser);
+        return;
+    }
+
+    // Update current user data with latest from database
+    currentUser.first_name = landlordData.first_name;
+    currentUser.last_name = landlordData.last_name;
+    currentUser.mobile = landlordData.mobile;
+    
+    // Update localStorage with latest data
+    localStorage.setItem('housingo_user', JSON.stringify(currentUser));
+
+    // Auto-fill with fresh data
+    autoFillContactInfo(landlordData);
+
+    } catch (error) {
+    console.error('Error loading landlord data:', error);
+    // Fallback to stored user data
+    autoFillContactInfo(currentUser);
+    }
+}
+
+function autoFillContactInfo(userData) {
+    // Auto-fill contact information from landlord profile
+    const contactName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim();
+    const contactNumber = userData.mobile || '';
+
+    // Set values immediately
+    const contactNameField = document.getElementById('contact-name');
+    const contactNumberField = document.getElementById('contact-number');
+    
+    if (contactNameField) {
+    contactNameField.value = contactName;
+    }
+    if (contactNumberField) {
+    contactNumberField.value = contactNumber;
+    }
+
+    // Show helpful message if mobile number is missing
+    if (!contactNumber) {
+    showToast('Please update your mobile number in your profile settings for better contact experience.');
+    }
+
+    // Also set up the form to auto-fill whenever the page is shown (backup)
+    setTimeout(() => {
+    if (contactNameField) {
+        contactNameField.value = contactName;
+    }
+    if (contactNumberField) {
+        contactNumberField.value = contactNumber;
+    }
+    }, 100);
+
+    console.log('✅ Contact info auto-filled:', { contactName, contactNumber });
 }
 
 // Image upload preview
@@ -3091,10 +3271,13 @@ function filterBrowseProperties() {
 
     let filtered = browseProperties.filter(property => {
     const matchesSearch = !searchTerm || 
+        (property.property_name && property.property_name.toLowerCase().includes(searchTerm)) ||
         (property.type && property.type.toLowerCase().includes(searchTerm)) ||
         (property.city && property.city.toLowerCase().includes(searchTerm)) ||
         (property.barangay && property.barangay.toLowerCase().includes(searchTerm)) ||
-        (property.address && property.address.toLowerCase().includes(searchTerm));
+        (property.address && property.address.toLowerCase().includes(searchTerm)) ||
+        (property.nearby_landmarks && property.nearby_landmarks.toLowerCase().includes(searchTerm)) ||
+        (property.description && property.description.toLowerCase().includes(searchTerm));
 
     const matchesType = !selectedBrowseType || property.type === selectedBrowseType;
 
@@ -3147,7 +3330,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (browseSearchInput) {
     browseSearchInput.addEventListener('keyup', (e) => {
-        if (e.key === 'Enter') filterBrowseProperties();
+        if (e.key === 'Enter') {
+        filterBrowseProperties();
+        } else {
+        // Real-time search with debounce
+        clearTimeout(window.browseSearchTimeout);
+        window.browseSearchTimeout = setTimeout(filterBrowseProperties, 300);
+        }
+    });
+    browseSearchInput.addEventListener('input', () => {
+        // Real-time search with debounce
+        clearTimeout(window.browseSearchTimeout);
+        window.browseSearchTimeout = setTimeout(filterBrowseProperties, 300);
     });
     }
     
